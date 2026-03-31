@@ -1,55 +1,60 @@
-# 模块化多智能体小说生成系统架构设计 (v2.1)
-**核心特性：黑板模式 (Blackboard) + 渐进式揭露记忆 (Progressive Disclosure) + 三级节奏控制 (Pacing Control)**
+# 模块化多智能体小说生成系统架构设计 (v3.0 - LangGraph 生态版)
+**核心特性：状态机图表 (StateGraph) + 渐进式揭露记忆 (Progressive Disclosure) + 三级节奏控制 (Pacing Control)**
 
-## 1. 架构总览
-系统底座依然采用**黑板模式与事件驱动架构**解耦各模块。在此基础上，为了解决长篇小说的“上下文过载”和“贪心生成（局部最优导致全局崩盘）”问题，系统融合了**三级渐进式记忆架构**与**三级大纲节奏控制**。
+## 1. 架构总览与技术栈选型
+系统摒弃了早期的自定义 Redis Pub/Sub 事件驱动模型，全面拥抱 **LangChain / LangGraph** 生态。通过“有向无环/有环图 (Graph)”和“全局状态机 (State)”来管理复杂的 Agent 交互与长文本流转，彻底解决长篇连载中的上下文过载、幻觉以及多章节状态同步问题。
+
+* **调度编排**：`LangGraph` (替代自建主控与消息总线)
+* **工具链与检索**：`LangChain` 核心库 (替代手搓的 API 请求与数据库查询)
+* **状态与持久化**：`LangGraph Checkpointer` (如 SQLiteSaver，替代 Redis 临时黑板)
+
+
 
 ---
 
 ## 2. 核心机制一：三级大纲与节奏控制 (Three-Tier Outline & Pacing)
-为防止 Agent 在单章中滥用高潮导致长篇连载失控，系统将剧情规划拆分为三个宏观维度：
+利用状态流转机制，系统对小说进行宏观、中观、微观三层控制，防止 Agent “贪心生成”（局部最优导致全局崩盘）。
 
 * **宏观层：全书大纲 (Global Logline)**
-    * 决定故事的终极方向。开书时生成，写死在 L0 记忆中。
+    * **定位**：故事的终极方向。开书时生成，固化在全局 State 中。
 * **中观层：剧情弧线与阶段 (Story Arc & Phase)**
-    * 解决“行文节奏”。将小说切分为多个卷宗（如：新手村篇、秘境篇）。
-    * 包含动态属性 `current_phase`（起/铺垫、承/发展、转/高潮、合/尾声）。此状态随章节推进而流转，直接约束初稿引擎的笔法。
+    * **定位**：解决“行文节奏”。将小说切分为多个卷宗。
+    * **动态属性**：包含 `current_phase`（起/铺垫、承/发展、转/高潮、合/尾声）。此状态随图表流转而更新，直接约束引擎的笔法。
 * **微观层：单章细纲 (Chapter Agenda)**
-    * 解决“本章演什么”。由情节引擎根据中观层的约束动态生成，阅后即焚。
-
-
+    * **定位**：解决“本章演什么”。作为单次 Graph 执行的输入动态推演，阅后即焚。
 
 ---
 
-## 3. 核心机制二：三级渐进式记忆系统 (Three-Tier Memory)
+## 3. 核心机制二：三级渐进式记忆系统 (Three-Tier Memory mapping)
+彻底抛弃“全量上下文注入”，采用 LangGraph 和 LangChain 组件实现按需供给的记忆流：
 
-在每次生成新章节时，系统分层提供信息：
-
-* **L0: 常驻工作台 (The Core Context) —— 【主动推 PUSH】**
-    * **机制**：直接写入黑板 `Workspace.Memory`，每次请求必定携带。
-    * **最新数据结构包含**：全书主线、**当前卷宗目标及阶段 (Arc Phase)**、上一章结尾动作、本章出场人物极简名单。
-* **L1: 语义与图谱检索 (Semantic & Graph Retrieval) —— 【按需拉 PULL】**
-    * **机制**：通过 Function Calling 触发。解决名词、道具、人物最新状态设定的幻觉问题。
-* **L2: 原文深潜 (Deep Git Retrieval) —— 【精准拉 PULL】**
-    * **机制**：通过 Function Calling 结合 Git 历史触发。提取精确的历史对话或场景原文，实现神级伏笔回收。
+* **L0: 常驻工作台 (The Core Context) —— 【State 自动推 PUSH】**
+    * **技术映射**：由 LangGraph 的 `TypedDict` 或 `Pydantic` 定义的全局 `NovelState`。
+    * **机制**：配合 `Checkpointer`，每次节点流转自动携带。包含全书主线、当前卷宗目标及阶段、上一章结尾动作。
+* **L1: 语义与图谱检索 (Semantic & Graph Retrieval) —— 【ToolNode 按需拉 PULL】**
+    * **技术映射**：LangChain `@tool` 装饰器 + 本地 VectorStore (如 FAISS/Chroma)。
+    * **机制**：通过 Function Calling 触发。解决名词、道具、人物最新状态设定的幻觉问题。Agent 自主调用 `query_setting` 工具获取精准设定。
+* **L2: 原文深潜 (Deep Git Retrieval) —— 【ToolNode 精准拉 PULL】**
+    * **技术映射**：LangChain `DocumentLoader` + `TextSplitter`。
+    * **机制**：提取精确的历史对话或场景原文，实现神级伏笔回收。
 
 ---
 
-## 4. 五大核心模块定义
+## 4. 核心工作流节点 (Node) 定义
 
-### 模块 1：记忆与版本控制模块 (Memory API)
-* 定位：档案馆与工具提供者。管理 Git 分支，暴露查询工具，异步压缩旧章节。
+在 LangGraph 架构下，原有的模块转化为 Graph 中的计算节点（Nodes），通过边（Edges）定义数据流向。
 
-### 模块 2：情节与世界观引擎 (Plot API)
-* 定位：DM（地下城主）与宏观调度器。
-* **核心职责**：管理图谱，并**负责推演三级大纲**。在每一卷结束时规划新卷；在每一章结束时推演下一章细纲，并流转 `current_phase`。
+### 节点 1：情节引擎 (Plotting Node)
+* **职责**：宏观调度器。读取 `NovelState` 中的 L0 记忆，结合上一章的剧情，推演本章的细纲 (`Agenda`)，并决策是否流转当前卷的 `current_phase`。
+* **输出**：更新 State 中的 `agenda` 和 `current_phase`。
 
-### 模块 3：角色状态矩阵 (Character API)
-* 定位：演员档案室。作为 L1 检索源，提供角色即时心理、动机与好感度。
+### 节点 2：初稿生成引擎 (Draft Writer Node)
+* **职责**：受节奏严格约束的智能作家。
+* **内部机制**：绑定了 L1/L2 查询工具的大模型。读取 State，遇到知识盲区时触发条件边（Conditional Edge），进入 `ToolNode` 查询资料，获取结果后生成逻辑严密的初稿文本。
+* **输出**：更新 State 中的 `draft_text`。
 
-### 模块 4：初稿生成引擎 (Draft Writer API)
-* 定位：具备 ReAct 能力且受节奏严格约束的智能作家。
-* **核心机制**：读取黑板 L0（重点审视 `current_phase`）与本章细纲 -> 思考并拉取 L1/L2 设定 -> 按指定节奏生成无幻觉的初稿文本 -> 写入黑板 `Workspace.Draft`。
+### 节点 3：知识工具节点 (Tool Node)
+* **职责**：被初稿引擎触发的独立执行单元。运行具体的 LangChain `@tool` 逻辑，访问数据库并返回设定数据，将其作为 `tool_message` 塞回上下文对话历史中。
 
-### 模块 5：文风渲染模块 (Style API)
-* 定位：润色师。结合 RAG 提取专属作家的风格语料库，重构初稿的修辞与节奏。
+### 节点 4：文风渲染与归档节点 (Polisher & Commit Node)
+* **职责**：润色初稿文本，提取本章摘要覆盖 `NovelState` 中的“上一章结尾”，触发 Checkpointer 持久化保存，为下一章生成做准备。
