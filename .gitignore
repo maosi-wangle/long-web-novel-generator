@@ -1,0 +1,12 @@
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 敏感配置与密钥
+.env
+auth.json
+*.toml
+
+# 杂项
+.DS_Store

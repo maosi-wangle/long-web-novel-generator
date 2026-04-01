@@ -1,0 +1,1 @@
+A multi-agent long-form web novel generation framework based on large models. Built with LangGraph state machines, integrated with RAG to ensure consistent settings and writing styles, enabling rapid chapter updates under rigorous worldbuilding.
