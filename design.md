@@ -1,60 +1,264 @@
-# 模块化多智能体小说生成系统架构设计 (v4.0 - 创世双向锚定版)
-**核心特性：上帝视角建图 (Top-down Worldbuilding) + 双向图谱检索 (Bidirectional GraphRAG) + 状态机流转 (LangGraph)**
+# 模块化多智能体小说生成系统架构设计（v4.3 - 人机协同版）
 
-## 1. 架构总览与技术栈选型
-本系统旨在解决超长篇 AI 小说连载中致命的“后期战力崩坏”、“吃书”与“伏笔废弃”问题。系统彻底摒弃“纯前文续写”模式，引入**双向锚定机制（参考前文 + 约束未来）**，在 LangGraph 的状态机调度下，配合 GraphRAG 实现精准的逻辑闭环。
+## 0. 产品定位（必须统一认知）
+本系统**不是完备的自动小说生产器**，而是“人工快速小说生成辅助系统”。
 
-* **调度与状态机**：`LangGraph` (控制节点流转与纠错回旋镖)
-* **持久化与回滚**：`LangGraph Checkpointer` (实现单章失败的无损回滚)
-* **双向知识图谱**：`GraphRAG` / `Neo4j` (管理过去的历史轨迹与未来的宿命轨迹)
-* **工具链交互**：`LangChain Core Tools` (将图谱查询封装为 Agent 工具)
+- 目标是加速作者工作流，而不是替代作者决策。
+- 任何章节进入初稿生成前，必须经过人工审阅细纲与 RAG 召回设定。
+- 后续必须支持前后端协作：前端承担审阅交互，后端承担工作流编排与状态管理。
 
 ---
 
-## 2. 第 0 阶段：创世大爆炸 (World Initialization)
-在系统开始生成第 1 章正文前，必须优先运行“创世智能体网络”，构建全书的静态基础物理法则与未来骨架，并将其写入图数据库。
-
-* **世界观法则 (World Bible)**：确立战力等级（如练气至大乘）、魔法体系、核心地理板块（如青云宗、魔界）。
-* **角色与命运拓扑 (Character & Destiny Topology)**：提前生成包含主角、核心反派、重要配角的身份卡，并在图谱中预埋“宿命边”（如预定第 50 章某角色陨落）。
-* **主线路标 (Global Waypoints)**：将全书大纲拆解为不可偏离的关键事件节点。
-
----
-
-## 3. 核心机制一：基于状态机的 4 级上下文包裹 (State Payload)
-利用 LangGraph 的 `NovelState`，将宏观设定与微观推演无缝传递给每一个执行节点。状态字典中包含：
-
-* **世界级约束**：`world_rules`（创世物理法则，防战力崩坏）。
-* **宏观级方向**：`global_outline`（全书大纲）、`future_waypoints`（未来必须到达的剧情路标）。
-* **中观级节奏**：`current_arc`（当前卷宗目标）、`current_phase`（起/承/转/合节奏，动态更新）。
-* **微观级切片**：`chapter_agenda`（本章细纲，阅后即焚）、`memory_l0`（当前物理场景的精准图谱切片）。
+## 核心特性
+1. **上帝视角建图（Top-down Worldbuilding）**：提前生成世界观与未来宿命并入库。
+2. **掩码注意力（Masked Attention）**：编剧可见全局，写手只见经人工确认后的局部上下文。
+3. **人机协同硬闸门（Human-in-the-Loop Gate）**：细纲与相关设定必须人工审核后才可进入 DraftWriter。
+4. **接口契约化（Interface Driven）**：状态、函数签名、路由决策均类型化，便于前后端与多节点协同开发。
 
 ---
 
-## 4. 核心机制二：双向图谱检索增强 (Bidirectional GraphRAG)
-彻底革新传统 RAG 只能“向后看”的弊端。系统的图谱本体 (Ontology) 包含双重维度的边 (Edges)：
+## 1. 第 0 阶段：创世初始化（World Initialization）
+在正文生成前，优先运行“创世智能体网络”，产出并持久化以下资产至 GraphRAG：
 
-* **向后检索 (Retrieve Past)**：提取常规边，如 `[林凡] -[已击败]-> [血煞长老]`，防止死人复活、装备错乱。
-* **向前检索 (Retrieve Future)**：提取宿命边/条件边，如 `[血煞长老] -[注定存活至]-> [第100章大决战]`。
-* **双向锚定融合**：Agent 必须在**过去的事实**与**未来的宿命**夹缝中，推演出当前章节的合理发展路径。
+- **世界观法则（World Bible）**：境界划分、能力上限、地理与移动规则。
+- **角色命运拓扑（Character & Destiny Topology）**：关键角色关系、不可提前触发的宿命事件、阶段性里程碑。
 
 ---
 
-## 5. 核心工作流节点 (Node) 与流转路由
-在 LangGraph 中，定义以下 4 个核心计算节点形成闭环。
+## 2. 全局状态契约（State Payload）
+**文件**：`novel_state.py`
 
-### 节点 1：双向图谱与情节引擎 (Plotting Node)
-* **职责**：宏观调度器。查询图谱的“过去”与“未来”，结合 `current_phase` 生成严格约束的本章细纲 (`chapter_agenda`)。
-* **动作**：如果图谱规定反派不能死，该节点必须在细纲中安排合理的“逃脱”或“中断”剧情。
+```python
+from typing import Literal, TypedDict
 
-### 节点 2：初稿引擎 (Draft Writer Node)
-* **职责**：纯粹的执行者（打字机）。
-* **动作**：严格读取包裹中的细纲、L0 记忆与世界观法则，只负责行文的连贯性、文笔与画面感生成。
+Phase = Literal["起", "承", "转", "合"]
+ReviewStatus = Literal["pending", "approved", "rejected", "edited"]
+RouteDecision = Literal["NeedHumanReview", "Rejected", "Approved", "Abort"]
 
-### 节点 3：时空合规质检员 (Critic Node)
-* **职责**：防止 AI 放飞自我的绝对门神。
-* **动作**：比对初稿正文与 `future_waypoints`。一旦发现初稿提前杀死了未来关键人物，或使用了当前境界无法使用的功法，立刻拦截，将详细修改意见写入 `error` 字段。
-* **路由机制 (Conditional Edge)**：若 `error` 不为空，状态自动打回 `Draft Writer Node` 重写（纠错回旋镖）。
 
-### 节点 4：历史沉淀机 (Memory Harvester Node)
-* **职责**：章节定稿后的收尾与入库工作。
-* **动作**：从正文中提取新的实体与关系变动。将图谱中原本的“宿命边”（预定发生）转化为“事实边”（已发生），并输出新的 `previous_chapter_ending` 供下一章使用。
+class RagEvidence(TypedDict, total=False):
+    source_id: str
+    title: str
+    snippet: str
+    score: float
+
+
+class NovelState(TypedDict, total=False):
+    # ===== 上帝视角字段（编剧/质检可见） =====
+    world_rules: str
+    global_outline: str
+    future_waypoints: str
+    guidance_from_future: str
+    current_arc: str
+
+    # ===== 章节执行字段 =====
+    current_phase: Phase
+    memory_l0: str
+    previous_chapter_ending: str
+    chapter_agenda: str
+
+    # ===== RAG 召回与人工审阅字段（v4.3 关键） =====
+    rag_recall_summary: str
+    rag_evidence: list[RagEvidence]
+    agenda_review_status: ReviewStatus
+    agenda_review_notes: str
+    approved_chapter_agenda: str
+    approved_rag_recall_summary: str
+
+    # ===== 产物与控制字段 =====
+    draft: str
+    draft_word_count: int
+    critic_feedback: str
+    error: str
+    rewrite_count: int
+    max_rewrites: int
+
+    model_name: str
+    temperature: float
+    use_mock_llm: bool
+```
+
+### 2.1 人工审核最小约束（必须）
+- `agenda_review_status != "approved"` 时，禁止进入 `DraftWriter`。
+- `DraftWriter` 只允许读取 `approved_chapter_agenda` 与 `approved_rag_recall_summary`（非原始版本）。
+
+---
+
+## 3. 节点定义与函数签名
+
+### Node A：编剧节点（Plotting Node）- 【全知】
+**文件**：`plot_planner.py`
+
+```python
+def plotting_node(state: NovelState) -> dict:
+    """
+    读取 world_rules/global_outline/future_waypoints/current_arc/current_phase/memory_l0
+    产出 chapter_agenda（候选细纲）
+    """
+    ...
+```
+
+### Node B：设定召回节点（RAG Recall Node）- 【全知】
+**文件**：`rag_recall.py`
+
+```python
+def rag_recall_node(state: NovelState) -> dict:
+    """
+    基于 chapter_agenda + 当前上下文检索相关设定。
+    产出 rag_recall_summary 与 rag_evidence。
+    """
+    ...
+```
+
+### Node C：人工审核闸门（Human Agenda Review Gate）- 【强制人工】
+**文件**：`human_review_gate.py`
+
+```python
+def human_agenda_review_gate(state: NovelState) -> dict:
+    """
+    由前端人工审阅 chapter_agenda + rag_recall_summary + rag_evidence。
+    人工可通过、驳回、编辑。
+    产出:
+      - agenda_review_status
+      - agenda_review_notes
+      - approved_chapter_agenda
+      - approved_rag_recall_summary
+    """
+    ...
+```
+
+### Node D：初稿写手（Draft Writer Node）- 【掩码】
+**文件**：`draft_writer.py`
+
+```python
+def build_draft_prompt(state: NovelState) -> str:
+    """
+    严格只读:
+      current_phase, memory_l0, previous_chapter_ending,
+      approved_chapter_agenda, approved_rag_recall_summary
+    禁止读取: world_rules, future_waypoints（掩码约束）
+    """
+    ...
+
+
+def draft_writer_node(state: NovelState) -> dict:
+    ...
+```
+
+### Node E：时空质检员（Critic Node）- 【全知】
+**文件**：`critic_reviewer.py`
+
+```python
+def critic_node(state: NovelState) -> dict:
+    """
+    校验 draft 是否违反 world_rules/future_waypoints。
+    合格返回 error=""；不合格返回 error 与 critic_feedback。
+    """
+    ...
+```
+
+### Node F：历史沉淀机（Memory Harvester Node）
+**文件**：`memory_harvester.py`
+
+```python
+def memory_harvester_node(state: NovelState) -> dict:
+    """
+    章节通过后提取实体关系、更新 previous_chapter_ending 并写入 GraphRAG。
+    """
+    ...
+```
+
+---
+
+## 4. 路由规则（LangGraph Routing）
+**文件**：`workflow.py`
+
+```python
+from langgraph.graph import END, START, StateGraph
+
+workflow = StateGraph(NovelState)
+
+workflow.add_node("PlotPlanner", plotting_node)
+workflow.add_node("RagRecall", rag_recall_node)
+workflow.add_node("HumanAgendaReview", human_agenda_review_gate)
+workflow.add_node("DraftWriter", draft_writer_node)
+workflow.add_node("CriticReviewer", critic_node)
+workflow.add_node("MemoryHarvester", memory_harvester_node)
+
+workflow.add_edge(START, "PlotPlanner")
+workflow.add_edge("PlotPlanner", "RagRecall")
+workflow.add_edge("RagRecall", "HumanAgendaReview")
+
+
+def route_after_human_review(state: NovelState) -> RouteDecision:
+    status = state.get("agenda_review_status", "pending")
+    if status in {"pending", "edited"}:
+        return "NeedHumanReview"
+    if status == "rejected":
+        return "Rejected"
+    return "Approved"
+
+
+workflow.add_conditional_edges(
+    "HumanAgendaReview",
+    route_after_human_review,
+    {
+        "NeedHumanReview": "HumanAgendaReview",  # 等待或继续人工编辑
+        "Rejected": "PlotPlanner",               # 人工打回重做细纲
+        "Approved": "DraftWriter",              # 人工放行后才能生成初稿
+    },
+)
+
+workflow.add_edge("DraftWriter", "CriticReviewer")
+
+
+def route_after_critic(state: NovelState) -> RouteDecision:
+    if state.get("error"):
+        if state.get("rewrite_count", 0) >= state.get("max_rewrites", 3):
+            return "Abort"
+        return "Rejected"
+    return "Approved"
+
+
+workflow.add_conditional_edges(
+    "CriticReviewer",
+    route_after_critic,
+    {
+        "Rejected": "DraftWriter",
+        "Approved": "MemoryHarvester",
+        "Abort": END,
+    },
+)
+
+workflow.add_edge("MemoryHarvester", END)
+app = workflow.compile()
+```
+
+---
+
+## 5. 前后端协作边界（v4.3 新增）
+
+### 5.1 后端职责
+- 执行 LangGraph 工作流、维护 `NovelState`、持久化审阅记录。
+- 提供 API：触发生成、拉取待审任务、提交审阅结论、继续执行图。
+- 对“未审核不可写作”做强制校验（服务端兜底，不依赖前端自觉）。
+
+### 5.2 前端职责
+- 展示细纲候选、RAG 召回证据、相关设定来源片段。
+- 提供人工操作：通过、驳回、编辑细纲；填写审阅备注。
+- 审核通过后再触发“进入初稿生成”。
+
+### 5.3 推荐最小 API（示意）
+- `POST /chapters/{id}/plan`：生成细纲候选 + RAG 召回。
+- `GET /chapters/{id}/review-task`：获取待人工审核内容。
+- `POST /chapters/{id}/review`：提交 `approved/rejected/edited` 及备注。
+- `POST /chapters/{id}/draft`：仅当审核通过时允许执行。
+
+---
+
+## 6. DoD（验收清单）
+- 文档明确系统定位为“人工快速生成辅助”，非全自动生产器。
+- 细纲生成后、初稿生成前存在强制人工审核节点。
+- 人工审核对象至少包含：`chapter_agenda` + `rag_recall_summary` + `rag_evidence`。
+- 后端存在“未审核不可进入 DraftWriter”的硬约束。
+- 路由存在重写上限与 `Abort` 分支，避免无限循环。
