@@ -1,51 +1,60 @@
-# 模块化多智能体小说生成系统架构设计 (v3.0 - LangGraph & GraphRAG 生态版)
-**核心特性：状态机图表 (StateGraph) + 图谱检索增强 (GraphRAG) + 三级节奏控制 (Pacing Control)**
+# 模块化多智能体小说生成系统架构设计 (v4.0 - 创世双向锚定版)
+**核心特性：上帝视角建图 (Top-down Worldbuilding) + 双向图谱检索 (Bidirectional GraphRAG) + 状态机流转 (LangGraph)**
 
 ## 1. 架构总览与技术栈选型
-系统全面拥抱 **LangChain / LangGraph** 生态，并通过 **GraphRAG（图谱检索增强生成）** 彻底解决长篇连载中的上下文过载、设定冲突（吃书）以及“挖坑不填”的致命痛点。
+本系统旨在解决超长篇 AI 小说连载中致命的“后期战力崩坏”、“吃书”与“伏笔废弃”问题。系统彻底摒弃“纯前文续写”模式，引入**双向锚定机制（参考前文 + 约束未来）**，在 LangGraph 的状态机调度下，配合 GraphRAG 实现精准的逻辑闭环。
 
-* **调度编排**：`LangGraph` (替代早期自建的 Redis Pub/Sub 主控与消息总线)
-* **状态与持久化**：`LangGraph Checkpointer` (如 SQLiteSaver，自带记忆快照与回滚)
-* **动态图谱与逻辑推演**：`GraphRAG` / `Neo4j` / `NetworkX` (管理剧情线与伏笔网络)
-* **工具链交互**：`LangChain Core Tools` (将图谱查询与本地检索封装为 Agent 工具)
-
-[Image of LangGraph architecture integrating state management and external GraphRAG tool nodes]
+* **调度与状态机**：`LangGraph` (控制节点流转与纠错回旋镖)
+* **持久化与回滚**：`LangGraph Checkpointer` (实现单章失败的无损回滚)
+* **双向知识图谱**：`GraphRAG` / `Neo4j` (管理过去的历史轨迹与未来的宿命轨迹)
+* **工具链交互**：`LangChain Core Tools` (将图谱查询封装为 Agent 工具)
 
 ---
 
-## 2. 核心机制一：三级大纲与节奏控制 (Three-Tier Outline & Pacing)
-利用 LangGraph 的状态流转机制，对小说进行宏观、中观、微观三层约束，防止 Agent “贪心生成”（单章滥用高潮导致全书崩溃）。
+## 2. 第 0 阶段：创世大爆炸 (World Initialization)
+在系统开始生成第 1 章正文前，必须优先运行“创世智能体网络”，构建全书的静态基础物理法则与未来骨架，并将其写入图数据库。
 
-* **宏观层：全书大纲 (Global Logline)**
-    * **定位**：故事的终极方向。开书时生成，固化在全局 State 中。
-* **中观层：剧情弧线与阶段 (Story Arc & Phase)**
-    * **定位**：解决“行文节奏”。将小说切分为多个卷宗。
-    * **动态属性**：包含 `current_phase`（起/铺垫、承/发展、转/高潮、合/尾声）。此状态随图表流转而动态更新，直接约束初稿引擎的笔法。
-* **微观层：单章细纲 (Chapter Agenda)**
-    * **定位**：解决“本章演什么”。作为单次 Graph 执行的输入动态推演，阅后即焚。
+* **世界观法则 (World Bible)**：确立战力等级（如练气至大乘）、魔法体系、核心地理板块（如青云宗、魔界）。
+* **角色与命运拓扑 (Character & Destiny Topology)**：提前生成包含主角、核心反派、重要配角的身份卡，并在图谱中预埋“宿命边”（如预定第 50 章某角色陨落）。
+* **主线路标 (Global Waypoints)**：将全书大纲拆解为不可偏离的关键事件节点。
 
 ---
 
-## 3. 核心机制二：基于 GraphRAG 的三级渐进式记忆系统
-彻底抛弃传统的“全量上下文注入”或“纯文本相似度检索”，采用基于知识图谱的按需供给：
+## 3. 核心机制一：基于状态机的 4 级上下文包裹 (State Payload)
+利用 LangGraph 的 `NovelState`，将宏观设定与微观推演无缝传递给每一个执行节点。状态字典中包含：
 
-* **L0: 常驻工作台 —— 【State 自动推 PUSH】**
-    * **机制**：由 LangGraph 定义的全局 `NovelState`。配合 Checkpointer 每次节点流转时自动携带。包含全书主线、当前卷宗目标及阶段、上一章结尾动作。
-* **L1: 剧情与伏笔图谱检索 —— 【GraphRAG 按需拉 PULL】**
-    * **图谱本体定义 (Ontology)**：
-        * **实体节点**：`Character` (角色), `Item` (道具), `Event` (事件), `Mystery` (伏笔/谜团)。
-        * **关系边线**：`PARTICIPATED_IN` (参与), `CAUSED_BY` (导致), `FORESHADOWS` (埋下伏笔), `RESOLVED_BY` (解开谜团)。
-    * **机制**：Agent 遇到知识盲区或需要填坑时，自主调用图谱工具（如 `query_unresolved_foreshadowing`），顺着图谱路径提取多线交织的准确设定与待回收伏笔。
-* **L2: 原文深潜检索 —— 【Document 向量精准拉 PULL】**
-    * **机制**：通过 LangChain `DocumentLoader` + `TextSplitter`。Agent 需要极度精确的台词回溯时调用，提取精确的历史对话原文。
-
-[Image of a knowledge graph mapping character relationships, plot events, and foreshadowing clues for a novel]
+* **世界级约束**：`world_rules`（创世物理法则，防战力崩坏）。
+* **宏观级方向**：`global_outline`（全书大纲）、`future_waypoints`（未来必须到达的剧情路标）。
+* **中观级节奏**：`current_arc`（当前卷宗目标）、`current_phase`（起/承/转/合节奏，动态更新）。
+* **微观级切片**：`chapter_agenda`（本章细纲，阅后即焚）、`memory_l0`（当前物理场景的精准图谱切片）。
 
 ---
 
-## 4. 核心工作流节点 (Node) 定义
-在 LangGraph 架构下，原有的微服务模块转化为 Graph 中的计算节点（Nodes），通过边（Edges）和条件路由（Conditional Edges）定义数据流向。
+## 4. 核心机制二：双向图谱检索增强 (Bidirectional GraphRAG)
+彻底革新传统 RAG 只能“向后看”的弊端。系统的图谱本体 (Ontology) 包含双重维度的边 (Edges)：
 
-### 节点 1：图谱与情节引擎 (Plotting & Graph Node)
-* **职责**：宏观调度器与图谱分析师。
-* **核心动作**：读取 `NovelState` 中的 L0 记忆，对 Graph
+* **向后检索 (Retrieve Past)**：提取常规边，如 `[林凡] -[已击败]-> [血煞长老]`，防止死人复活、装备错乱。
+* **向前检索 (Retrieve Future)**：提取宿命边/条件边，如 `[血煞长老] -[注定存活至]-> [第100章大决战]`。
+* **双向锚定融合**：Agent 必须在**过去的事实**与**未来的宿命**夹缝中，推演出当前章节的合理发展路径。
+
+---
+
+## 5. 核心工作流节点 (Node) 与流转路由
+在 LangGraph 中，定义以下 4 个核心计算节点形成闭环。
+
+### 节点 1：双向图谱与情节引擎 (Plotting Node)
+* **职责**：宏观调度器。查询图谱的“过去”与“未来”，结合 `current_phase` 生成严格约束的本章细纲 (`chapter_agenda`)。
+* **动作**：如果图谱规定反派不能死，该节点必须在细纲中安排合理的“逃脱”或“中断”剧情。
+
+### 节点 2：初稿引擎 (Draft Writer Node)
+* **职责**：纯粹的执行者（打字机）。
+* **动作**：严格读取包裹中的细纲、L0 记忆与世界观法则，只负责行文的连贯性、文笔与画面感生成。
+
+### 节点 3：时空合规质检员 (Critic Node)
+* **职责**：防止 AI 放飞自我的绝对门神。
+* **动作**：比对初稿正文与 `future_waypoints`。一旦发现初稿提前杀死了未来关键人物，或使用了当前境界无法使用的功法，立刻拦截，将详细修改意见写入 `error` 字段。
+* **路由机制 (Conditional Edge)**：若 `error` 不为空，状态自动打回 `Draft Writer Node` 重写（纠错回旋镖）。
+
+### 节点 4：历史沉淀机 (Memory Harvester Node)
+* **职责**：章节定稿后的收尾与入库工作。
+* **动作**：从正文中提取新的实体与关系变动。将图谱中原本的“宿命边”（预定发生）转化为“事实边”（已发生），并输出新的 `previous_chapter_ending` 供下一章使用。
