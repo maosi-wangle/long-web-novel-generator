@@ -5,6 +5,15 @@ from typing import Literal, TypedDict
 Phase = Literal["起", "承", "转", "合"]
 ReviewStatus = Literal["pending", "approved", "rejected", "edited"]
 RouteDecision = Literal["NeedHumanReview", "Rejected", "Approved", "Abort"]
+ChapterLifecycleStatus = Literal[
+    "planning",
+    "review_pending",
+    "approved",
+    "drafting",
+    "published",
+    "dirty",
+    "regenerate_required",
+]
 
 
 class RagEvidence(TypedDict, total=False):
@@ -28,7 +37,14 @@ class NovelState(TypedDict, total=False):
     """Global state flowing through LangGraph nodes."""
 
     # 追踪字段
+    novel_id: str  # 小说 ID，用于多小说分组与检索
+    novel_title: str  # 小说标题，供管理面板展示
     chapter_id: str  # 章节唯一 ID，接口与存储主键
+    chapter_number: int  # 章节序号，便于排序和章节管理
+    chapter_title: str  # 章节标题，供管理面板展示
+    version_id: str  # 当前章节版本 ID，为未来多版本章节治理预留
+    parent_version_id: str  # 当前版本来源的父版本 ID，为后续分叉/回改预留
+    chapter_status: ChapterLifecycleStatus  # 章节生命周期状态，为回改传播治理预留
     recall_trace_id: str  # 本轮召回事件追踪 ID
     review_trace_id: str  # 本轮人工审核事件追踪 ID
     audit_log_path: str  # 审计日志实际落盘路径

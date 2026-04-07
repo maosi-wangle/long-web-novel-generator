@@ -13,8 +13,10 @@ API startup flow (local development):
    python backend/src/novel_assist/cli/run_api.py
 
 3. Verify service:
+   - GET /
    - GET /healthz
-   - GET /docs
+   - GET /workbench
+   - GET /novels
 
 4. HITL API call order:
    - POST /chapters/{chapter_id}/plan
@@ -23,11 +25,19 @@ API startup flow (local development):
    - POST /chapters/{chapter_id}/draft
 """
 
-from fastapi import FastAPI, HTTPException
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from novel_assist.api.chapter_service import ChapterService
 from novel_assist.api.schemas import (
+    ApiErrorResponse,
+    ChapterListResponse,
+    ChapterStateResponse,
     DraftResponse,
+    NovelListResponse,
     PlanRequest,
     PlanResponse,
     ReviewRequest,
@@ -36,16 +46,60 @@ from novel_assist.api.schemas import (
 )
 
 app = FastAPI(title="Novel Assist HITL API", version="0.1.0")
+WORKBENCH_PATH = Path(__file__).with_name("workbench.html")
+
+
+class ApiErrorException(Exception):
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        error_code: str,
+        message: str,
+        detail: object = None,
+        trace_id: str = "",
+    ) -> None:
+        self.status_code = status_code
+        self.error_code = error_code
+        self.message = message
+        self.detail = detail
+        self.trace_id = trace_id
+        super().__init__(message)
+
+
+def _error_payload(exc: ApiErrorException) -> dict[str, object]:
+    payload = ApiErrorResponse(
+        error_code=exc.error_code,
+        message=exc.message,
+        detail=exc.detail,
+        trace_id=exc.trace_id,
+    )
+    return payload.model_dump()
 
 
 @app.middleware("http")
-async def ensure_utf8_json_charset(request, call_next):
-    # Ensure Invoke-RestMethod and other clients decode Chinese JSON correctly.
-    response = await call_next(request) #返回一个response
+async def ensure_utf8_json_charset(request: Request, call_next):
+    # Ensure browser/fetch/Invoke-RestMethod decode Chinese JSON consistently.
+    response = await call_next(request)
     content_type = response.headers.get("content-type", "")
     if content_type.startswith("application/json") and "charset=" not in content_type.lower():
         response.headers["content-type"] = "application/json; charset=utf-8"
     return response
+
+
+@app.exception_handler(ApiErrorException)
+async def handle_api_error(_: Request, exc: ApiErrorException) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content=_error_payload(exc))
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+    payload = ApiErrorResponse(
+        error_code="REQUEST_VALIDATION_ERROR",
+        message="Request validation failed.",
+        detail=exc.errors(),
+    )
+    return JSONResponse(status_code=422, content=payload.model_dump())
 
 
 @app.get("/")
@@ -55,11 +109,15 @@ def root() -> dict[str, object]:
         "version": "0.1.0",
         "docs": "/docs",
         "health": "/healthz",
+        "workbench": "/workbench",
         "endpoints": [
+            "GET /novels",
+            "GET /novels/{novel_id}/chapters",
             "POST /chapters/{chapter_id}/plan",
             "GET /chapters/{chapter_id}/review-task",
             "POST /chapters/{chapter_id}/review",
             "POST /chapters/{chapter_id}/draft",
+            "GET /chapters/{chapter_id}/state",
         ],
     }
 
@@ -69,13 +127,35 @@ def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/workbench", response_class=HTMLResponse)
+def workbench() -> HTMLResponse:
+    return HTMLResponse(WORKBENCH_PATH.read_text(encoding="utf-8"))
+
+
+@app.get("/novels", response_model=NovelListResponse)
+def list_novels() -> NovelListResponse:
+    service = ChapterService()
+    return NovelListResponse(novels=service.list_novels())
+
+
+@app.get("/novels/{novel_id}/chapters", response_model=ChapterListResponse)
+def list_chapters(novel_id: str) -> ChapterListResponse:
+    service = ChapterService()
+    return ChapterListResponse(**service.list_chapters(novel_id=novel_id))
+
+
 @app.post("/chapters/{chapter_id}/plan", response_model=PlanResponse)
 def create_plan(chapter_id: str, payload: PlanRequest) -> PlanResponse:
     # Step 1 in HITL flow: build agenda + RAG evidence, then wait for human review.
     service = ChapterService()
     state = service.generate_plan(chapter_id=chapter_id, overrides=payload.model_dump())
     return PlanResponse(
+        novel_id=str(state.get("novel_id", "")),
+        novel_title=str(state.get("novel_title", "")),
         chapter_id=chapter_id,
+        chapter_number=state.get("chapter_number"),
+        chapter_title=str(state.get("chapter_title", "")),
+        chapter_status=str(state.get("chapter_status", "")),
         chapter_agenda=str(state.get("chapter_agenda", "")),
         rag_recall_summary=str(state.get("rag_recall_summary", "")),
         rag_evidence=list(state.get("rag_evidence", [])),
@@ -92,8 +172,27 @@ def get_review_task(chapter_id: str) -> ReviewTaskResponse:
     service = ChapterService()
     task = service.get_review_task(chapter_id=chapter_id)
     if not task:
-        raise HTTPException(status_code=404, detail="chapter not found")
+        raise ApiErrorException(
+            status_code=404,
+            error_code="CHAPTER_NOT_FOUND",
+            message="Chapter review task not found.",
+            detail={"chapter_id": chapter_id},
+        )
     return ReviewTaskResponse(**task)
+
+
+@app.get("/chapters/{chapter_id}/state", response_model=ChapterStateResponse)
+def get_chapter_state(chapter_id: str) -> ChapterStateResponse:
+    service = ChapterService()
+    state = service.get_chapter_state(chapter_id=chapter_id)
+    if not state:
+        raise ApiErrorException(
+            status_code=404,
+            error_code="CHAPTER_NOT_FOUND",
+            message="Chapter state not found.",
+            detail={"chapter_id": chapter_id},
+        )
+    return ChapterStateResponse(chapter_id=chapter_id, state=state)
 
 
 @app.post("/chapters/{chapter_id}/review", response_model=ReviewResponse)
@@ -109,10 +208,20 @@ def submit_review(chapter_id: str, payload: ReviewRequest) -> ReviewResponse:
             approved_rag_recall_summary=payload.approved_rag_recall_summary,
         )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise ApiErrorException(
+            status_code=404,
+            error_code="CHAPTER_NOT_FOUND",
+            message="Cannot submit review because chapter state does not exist.",
+            detail={"chapter_id": chapter_id, "reason": str(exc)},
+        ) from exc
 
     return ReviewResponse(
+        novel_id=str(state.get("novel_id", "")),
+        novel_title=str(state.get("novel_title", "")),
         chapter_id=chapter_id,
+        chapter_number=state.get("chapter_number"),
+        chapter_title=str(state.get("chapter_title", "")),
+        chapter_status=str(state.get("chapter_status", "")),
         agenda_review_status=str(state.get("agenda_review_status", "")),
         agenda_review_notes=str(state.get("agenda_review_notes", "")),
         approved_chapter_agenda=str(state.get("approved_chapter_agenda", "")),
@@ -131,12 +240,27 @@ def create_draft(chapter_id: str) -> DraftResponse:
     try:
         state = service.generate_draft(chapter_id=chapter_id)
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise ApiErrorException(
+            status_code=404,
+            error_code="CHAPTER_NOT_FOUND",
+            message="Cannot generate draft because chapter state does not exist.",
+            detail={"chapter_id": chapter_id, "reason": str(exc)},
+        ) from exc
     except PermissionError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise ApiErrorException(
+            status_code=409,
+            error_code="HUMAN_REVIEW_REQUIRED",
+            message="Draft generation is blocked until the chapter review is approved.",
+            detail={"chapter_id": chapter_id, "reason": str(exc)},
+        ) from exc
 
     return DraftResponse(
+        novel_id=str(state.get("novel_id", "")),
+        novel_title=str(state.get("novel_title", "")),
         chapter_id=chapter_id,
+        chapter_number=state.get("chapter_number"),
+        chapter_title=str(state.get("chapter_title", "")),
+        chapter_status=str(state.get("chapter_status", "")),
         agenda_review_status=str(state.get("agenda_review_status", "")),
         draft=str(state.get("draft", "")),
         draft_word_count=int(state.get("draft_word_count", 0)),

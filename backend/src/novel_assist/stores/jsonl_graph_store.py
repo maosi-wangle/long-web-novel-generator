@@ -18,6 +18,15 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _as_int(value: Any, default: int | None = None) -> int | None:
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 class JsonlGraphStore(GraphStore):
     """JSONL + JSON implementation for local development."""
 
@@ -63,6 +72,21 @@ class JsonlGraphStore(GraphStore):
             encoding="utf-8",
         )
         return str(self._state_path)
+
+    @staticmethod
+    def _chapter_summary(chapter_id: str, state: dict[str, Any]) -> dict[str, Any]:
+        chapter_number = _as_int(state.get("chapter_number"))
+        return {
+            "chapter_id": chapter_id,
+            "novel_id": str(state.get("novel_id", "")),
+            "novel_title": str(state.get("novel_title", "")),
+            "chapter_number": chapter_number,
+            "chapter_title": str(state.get("chapter_title", "")),
+            "chapter_status": str(state.get("chapter_status", "")),
+            "agenda_review_status": str(state.get("agenda_review_status", "pending")),
+            "draft_word_count": _as_int(state.get("draft_word_count"), 0) or 0,
+            "updated_at": str(state.get("updated_at", "")),
+        }
 
     def persist_rag_recall_event(
         self,
@@ -116,6 +140,10 @@ class JsonlGraphStore(GraphStore):
         data = self._read_state_map()
         copied = dict(state)
         copied["chapter_id"] = chapter_id
+        copied["novel_id"] = str(copied.get("novel_id") or "novel-demo-001")
+        copied["novel_title"] = str(copied.get("novel_title") or copied["novel_id"])
+        copied["chapter_title"] = str(copied.get("chapter_title") or chapter_id)
+        copied["chapter_number"] = _as_int(copied.get("chapter_number"), 1) or 1
         copied["updated_at"] = _utc_now_iso()
         data[chapter_id] = copied
         return self._write_state_map(data)
@@ -150,7 +178,12 @@ class JsonlGraphStore(GraphStore):
         review_event = events.get("human_review", {})
 
         return {
+            "novel_id": str(state.get("novel_id", "")),
+            "novel_title": str(state.get("novel_title", "")),
             "chapter_id": chapter_id,
+            "chapter_number": _as_int(state.get("chapter_number")),
+            "chapter_title": str(state.get("chapter_title", "")),
+            "chapter_status": str(state.get("chapter_status", "")),
             "chapter_agenda": state.get("chapter_agenda", ""),
             "rag_recall_summary": state.get("rag_recall_summary", ""),
             "rag_evidence": state.get("rag_evidence", []),
@@ -161,7 +194,54 @@ class JsonlGraphStore(GraphStore):
             "recall_trace_id": state.get("recall_trace_id", ""),
             "review_trace_id": state.get("review_trace_id", ""),
             "audit_log_path": state.get("audit_log_path", str(self._audit_path)),
+            "audit_warning": state.get("audit_warning", ""),
             "latest_recall_event": recall_event,
             "latest_review_event": review_event,
             "updated_at": state.get("updated_at", ""),
         }
+
+    def list_novels(self) -> list[dict[str, Any]]:
+        grouped: dict[str, dict[str, Any]] = {}
+        for chapter_id, state in self._read_state_map().items():
+            novel_id = str(state.get("novel_id") or "novel-demo-001")
+            novel_title = str(state.get("novel_title") or novel_id)
+            updated_at = str(state.get("updated_at", ""))
+            current = grouped.get(novel_id)
+            if current is None:
+                grouped[novel_id] = {
+                    "novel_id": novel_id,
+                    "novel_title": novel_title,
+                    "chapter_count": 1,
+                    "latest_chapter_id": chapter_id,
+                    "latest_chapter_title": str(state.get("chapter_title", "")),
+                    "updated_at": updated_at,
+                }
+                continue
+
+            current["chapter_count"] = int(current.get("chapter_count", 0)) + 1
+            if updated_at >= str(current.get("updated_at", "")):
+                current["novel_title"] = novel_title
+                current["latest_chapter_id"] = chapter_id
+                current["latest_chapter_title"] = str(state.get("chapter_title", ""))
+                current["updated_at"] = updated_at
+
+        novels = list(grouped.values())
+        novels.sort(key=lambda item: (str(item.get("updated_at", "")), str(item.get("novel_id", ""))), reverse=True)
+        return novels
+
+    def list_chapters(self, *, novel_id: str) -> list[dict[str, Any]]:
+        chapters: list[dict[str, Any]] = []
+        for chapter_id, state in self._read_state_map().items():
+            state_novel_id = str(state.get("novel_id") or "novel-demo-001")
+            if state_novel_id != novel_id:
+                continue
+            chapters.append(self._chapter_summary(chapter_id, state))
+
+        chapters.sort(
+            key=lambda item: (
+                item.get("chapter_number") is None,
+                item.get("chapter_number") if item.get("chapter_number") is not None else 0,
+                str(item.get("chapter_id", "")),
+            )
+        )
+        return chapters

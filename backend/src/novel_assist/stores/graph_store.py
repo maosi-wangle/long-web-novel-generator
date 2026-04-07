@@ -44,3 +44,11 @@ class GraphStore(ABC):
     @abstractmethod
     def get_review_task(self, *, chapter_id: str) -> dict[str, Any] | None:
         raise NotImplementedError
+
+    @abstractmethod
+    def list_novels(self) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_chapters(self, *, novel_id: str) -> list[dict[str, Any]]:
+        raise NotImplementedError

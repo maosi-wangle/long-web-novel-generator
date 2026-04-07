@@ -14,10 +14,18 @@ from novel_assist.stores.factory import get_graph_store
 
 
 class ChapterService:
-    """Application service for chapter planning, review, and draft generation."""
+    """Application service for chapter planning, review, draft generation, and chapter browsing."""
 
     def __init__(self) -> None:
         self._store = get_graph_store()
+
+    @staticmethod
+    def _coerce_metadata(state: dict[str, Any], *, chapter_id: str) -> None:
+        state["novel_id"] = str(state.get("novel_id") or "novel-demo-001")
+        state["novel_title"] = str(state.get("novel_title") or state["novel_id"])
+        state["chapter_id"] = chapter_id
+        state["chapter_title"] = str(state.get("chapter_title") or chapter_id)
+        state["chapter_number"] = int(state.get("chapter_number") or 1)
 
     def generate_plan(self, *, chapter_id: str, overrides: dict[str, Any]) -> dict[str, Any]:
         state = build_initial_state()
@@ -25,26 +33,44 @@ class ChapterService:
             if value is not None:
                 state[key] = value
 
+        self._coerce_metadata(state, chapter_id=chapter_id)
         state.update(
             {
-                "chapter_id": chapter_id,
                 "agenda_review_status": "pending",
                 "agenda_review_notes": "",
                 "approved_chapter_agenda": "",
                 "approved_rag_recall_summary": "",
+                "chapter_status": "review_pending",
                 "error": "",
             }
         )
 
         state.update(plotting_node(state))
         state.update(rag_recall_node(state))
-        state["error"] = "HumanReviewRequired: 等待人工审核细纲与RAG设定。"
+        state["error"] = "HumanReviewRequired: chapter agenda and recall evidence must be approved before drafting."
 
         self._store.save_chapter_state(chapter_id=chapter_id, state=state)
         return state
 
     def get_review_task(self, *, chapter_id: str) -> dict[str, Any] | None:
         return self._store.get_review_task(chapter_id=chapter_id)
+
+    def get_chapter_state(self, *, chapter_id: str) -> dict[str, Any] | None:
+        return self._store.get_chapter_state(chapter_id=chapter_id)
+
+    def list_novels(self) -> list[dict[str, Any]]:
+        return self._store.list_novels()
+
+    def list_chapters(self, *, novel_id: str) -> dict[str, Any]:
+        chapters = self._store.list_chapters(novel_id=novel_id)
+        novel_title = ""
+        if chapters:
+            novel_title = str(chapters[0].get("novel_title", ""))
+        return {
+            "novel_id": novel_id,
+            "novel_title": novel_title,
+            "chapters": chapters,
+        }
 
     def submit_review(
         self,
@@ -59,9 +85,9 @@ class ChapterService:
         if not state:
             raise KeyError(f"chapter_id not found: {chapter_id}")
 
+        self._coerce_metadata(state, chapter_id=chapter_id)
         state.update(
             {
-                "chapter_id": chapter_id,
                 "agenda_review_status": agenda_review_status,
                 "agenda_review_notes": agenda_review_notes,
                 "approved_chapter_agenda": approved_chapter_agenda,
@@ -70,6 +96,15 @@ class ChapterService:
             }
         )
         state.update(human_agenda_review_gate(state))
+
+        final_status = str(state.get("agenda_review_status", "pending"))
+        if final_status == "approved":
+            state["chapter_status"] = "approved"
+        elif final_status == "rejected":
+            state["chapter_status"] = "regenerate_required"
+        else:
+            state["chapter_status"] = "review_pending"
+
         self._store.save_chapter_state(chapter_id=chapter_id, state=state)
         return state
 
@@ -78,9 +113,15 @@ class ChapterService:
         if not state:
             raise KeyError(f"chapter_id not found: {chapter_id}")
         if str(state.get("agenda_review_status", "pending")) != "approved":
-            raise PermissionError("HumanReviewRequired: 仅审核通过章节可生成初稿。")
+            raise PermissionError(
+                "HumanReviewRequired: draft generation is blocked until agenda review is approved."
+            )
+
+        self._coerce_metadata(state, chapter_id=chapter_id)
+        state["chapter_status"] = "drafting"
 
         max_rewrites = int(state.get("max_rewrites", 3))
+        decision = "Approved"
         for _ in range(max_rewrites + 1):
             state.update(draft_writer_node(state))
             state.update(critic_node(state))
@@ -90,6 +131,11 @@ class ChapterService:
             if decision == "Approved":
                 state.update(memory_harvester_node(state))
             break
+
+        if decision == "Abort":
+            state["chapter_status"] = "regenerate_required"
+        elif decision == "Approved":
+            state["chapter_status"] = "published"
 
         self._store.save_chapter_state(chapter_id=chapter_id, state=state)
         return state

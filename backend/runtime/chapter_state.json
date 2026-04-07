@@ -70,5 +70,149 @@
     "draft": "夜色压低了屋檐，风从巷口掠过，带起潮湿的尘土味。他想起白天那句没有说完的话，脚步在石阶前停了半拍。此刻正是“起”段节奏，所有异样都被轻轻按住，却又在沉默里一点点露出锋芒。他脑海中不断回闪设定线索：本轮召回共 6 条证据。优先命中硬约束 3 条，补充上下文 3 条。当前细纲：主角在黑市找解码师，确认自己被人跟踪。。主角在黑市找解码师，确认自己被人跟踪。",
     "draft_word_count": 176,
     "critic_feedback": "CriticPassed: 未发现规则冲突。"
+  },
+  "chapter-demo-002": {
+    "novel_id": "novel-demo-001",
+    "novel_title": "novel-demo-001",
+    "chapter_id": "chapter-demo-002",
+    "chapter_number": 1,
+    "chapter_title": "chapter-demo-002",
+    "global_outline": "在旧工业城邦的废墟上，一群年轻人试图揭开能源垄断背后的真相。",
+    "current_arc": "主角第一次接触反抗组织，并意识到父亲失踪并非意外。",
+    "current_phase": "起",
+    "memory_l0": "主角林澈，机械修理铺学徒，擅长观察细节。",
+    "previous_chapter_ending": "林澈在暴雨夜捡到一枚带有议会徽记的损坏数据芯片。",
+    "chapter_agenda": "主角在黑市找解码师，确认自己被人跟踪。",
+    "world_rules": "筑基期不能瞬移。",
+    "future_waypoints": "跟踪者不能在本章死亡。",
+    "guidance_from_future": "跟踪者将在中后期揭示主角父亲失踪真相。",
+    "agenda_review_status": "pending",
+    "agenda_review_notes": "",
+    "approved_chapter_agenda": "",
+    "approved_rag_recall_summary": "",
+    "chapter_status": "review_pending",
+    "rewrite_count": 0,
+    "max_rewrites": 3,
+    "model_name": "qwen3-max-preview",
+    "temperature": 0.9,
+    "use_mock_llm": true,
+    "show_draft_system_prompt": false,
+    "show_draft_prompt": false,
+    "error": "HumanReviewRequired: chapter agenda and recall evidence must be approved before drafting.",
+    "rag_recall_summary": "本轮召回共 6 条证据。优先命中硬约束 3 条，补充上下文 3 条。当前细纲：主角在黑市找解码师，确认自己被人跟踪。",
+    "rag_evidence": [
+      {
+        "source_id": "hard-constraint-01",
+        "title": "硬规则/宿命约束",
+        "snippet": "筑基期不能瞬移",
+        "score": 0.93
+      },
+      {
+        "source_id": "hard-constraint-02",
+        "title": "硬规则/宿命约束",
+        "snippet": "跟踪者不能在本章死亡",
+        "score": 0.9
+      },
+      {
+        "source_id": "hard-constraint-03",
+        "title": "硬规则/宿命约束",
+        "snippet": "跟踪者将在中后期揭示主角父亲失踪真相",
+        "score": 0.87
+      },
+      {
+        "source_id": "near-context-01",
+        "title": "相邻章节上下文",
+        "snippet": "林澈在暴雨夜捡到一枚带有议会徽记的损坏数据芯片",
+        "score": 0.74
+      },
+      {
+        "source_id": "near-context-02",
+        "title": "相邻章节上下文",
+        "snippet": "主角林澈，机械修理铺学徒，擅长观察细节",
+        "score": 0.7
+      },
+      {
+        "source_id": "near-context-03",
+        "title": "相邻章节上下文",
+        "snippet": "主角第一次接触反抗组织，并意识到父亲失踪并非意外",
+        "score": 0.66
+      }
+    ],
+    "recall_trace_id": "recall-4985d060d9704189b9f1d8ac4f8c38fc",
+    "audit_log_path": "C:\\project\\generateNovel\\backend\\runtime\\review_audit.jsonl",
+    "audit_warning": "",
+    "updated_at": "2026-04-07T20:09:31.581664+00:00"
+  },
+  "chapter-demo-ui-001": {
+    "chapter_id": "chapter-demo-ui-001",
+    "global_outline": "在旧工业城邦的废墟上，一群年轻人试图揭开能源垄断背后的真相。",
+    "current_arc": "主角第一次接触反抗组织，并意识到父亲失踪并非意外。",
+    "current_phase": "起",
+    "memory_l0": "主角林澈，机械修理铺学徒，擅长观察细节。",
+    "previous_chapter_ending": "夜色压低了屋檐，风从巷口掠过，带起潮湿的尘土味。他想起白天那句没有说完的话，脚步在石阶前停了半拍。此刻正是“起”段节奏，所有异样都被轻轻按住，却又在沉默里一点点露出锋芒。他脑海中不断回闪设定线索：本轮召回共 6 条证据。优先命中硬约束 3 条，补充上下文 3 条。当前细纲：主角在黑市找解码师，确认自己被人跟踪。。主角在黑市找解码师，确认自己被人跟踪。",
+    "chapter_agenda": "主角在黑市找解码师，确认自己被人跟踪。",
+    "world_rules": "筑基期不能瞬移。",
+    "future_waypoints": "跟踪者不能在本章死亡。",
+    "guidance_from_future": "跟踪者将在中后期揭示主角父亲失踪真相。",
+    "agenda_review_status": "approved",
+    "agenda_review_notes": "通过，进入初稿生成。",
+    "approved_chapter_agenda": "主角在黑市找解码师，确认自己被人跟踪。",
+    "approved_rag_recall_summary": "本轮召回共 6 条证据。优先命中硬约束 3 条，补充上下文 3 条。当前细纲：主角在黑市找解码师，确认自己被人跟踪。",
+    "rewrite_count": 0,
+    "max_rewrites": 3,
+    "model_name": "qwen3-max-preview",
+    "temperature": 0.9,
+    "use_mock_llm": true,
+    "show_draft_system_prompt": false,
+    "show_draft_prompt": false,
+    "error": "",
+    "rag_recall_summary": "本轮召回共 6 条证据。优先命中硬约束 3 条，补充上下文 3 条。当前细纲：主角在黑市找解码师，确认自己被人跟踪。",
+    "rag_evidence": [
+      {
+        "source_id": "hard-constraint-01",
+        "title": "硬规则/宿命约束",
+        "snippet": "筑基期不能瞬移",
+        "score": 0.93
+      },
+      {
+        "source_id": "hard-constraint-02",
+        "title": "硬规则/宿命约束",
+        "snippet": "跟踪者不能在本章死亡",
+        "score": 0.9
+      },
+      {
+        "source_id": "hard-constraint-03",
+        "title": "硬规则/宿命约束",
+        "snippet": "跟踪者将在中后期揭示主角父亲失踪真相",
+        "score": 0.87
+      },
+      {
+        "source_id": "near-context-01",
+        "title": "相邻章节上下文",
+        "snippet": "林澈在暴雨夜捡到一枚带有议会徽记的损坏数据芯片",
+        "score": 0.74
+      },
+      {
+        "source_id": "near-context-02",
+        "title": "相邻章节上下文",
+        "snippet": "主角林澈，机械修理铺学徒，擅长观察细节",
+        "score": 0.7
+      },
+      {
+        "source_id": "near-context-03",
+        "title": "相邻章节上下文",
+        "snippet": "主角第一次接触反抗组织，并意识到父亲失踪并非意外",
+        "score": 0.66
+      }
+    ],
+    "recall_trace_id": "recall-3240729e95b14b098847210d63847565",
+    "audit_log_path": "C:\\project\\generateNovel\\backend\\runtime\\review_audit.jsonl",
+    "audit_warning": "",
+    "updated_at": "2026-04-07T18:57:26.037821+00:00",
+    "enforce_state_review_status": true,
+    "review_trace_id": "review-8741350b4a1c4730a23bfcc8bbc39f76",
+    "draft": "夜色压低了屋檐，风从巷口掠过，带起潮湿的尘土味。他想起白天那句没有说完的话，脚步在石阶前停了半拍。此刻正是“起”段节奏，所有异样都被轻轻按住，却又在沉默里一点点露出锋芒。他脑海中不断回闪设定线索：本轮召回共 6 条证据。优先命中硬约束 3 条，补充上下文 3 条。当前细纲：主角在黑市找解码师，确认自己被人跟踪。。主角在黑市找解码师，确认自己被人跟踪。",
+    "draft_word_count": 176,
+    "critic_feedback": "CriticPassed: 未发现规则冲突。"
   }
 }

@@ -24,7 +24,11 @@ def _as_bool(value: object) -> bool:
 def build_initial_state() -> NovelState:
     use_mock = _as_bool(os.getenv("USE_MOCK_LLM", "1"))
     return {
+        "novel_id": os.getenv("NOVEL_ID", "demo-novel-001"),
+        "novel_title": os.getenv("NOVEL_TITLE", "默认演示小说"),
         "chapter_id": os.getenv("CHAPTER_ID", "demo-chapter-001"),
+        "chapter_number": int(os.getenv("CHAPTER_NUMBER", "1")),
+        "chapter_title": os.getenv("CHAPTER_TITLE", "第一章"),
         "global_outline": "在旧工业城邦的废墟上，一群年轻人试图揭开能源垄断背后的真相。",
         "current_arc": "主角第一次接触反抗组织，并意识到父亲失踪并非意外。",
         "current_phase": "起",
@@ -38,6 +42,7 @@ def build_initial_state() -> NovelState:
         "agenda_review_notes": "",
         "approved_chapter_agenda": "",
         "approved_rag_recall_summary": "",
+        "chapter_status": "planning",
         "rewrite_count": 0,
         "max_rewrites": int(os.getenv("MAX_REWRITES", "3")),
         "model_name": os.getenv("LLM_MODEL_NAME", "qwen3-max-preview"),
