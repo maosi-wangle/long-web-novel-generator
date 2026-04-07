@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+from typing import Any
+
+from novel_assist.cli.run_stage2 import build_initial_state
+from novel_assist.nodes.critic_reviewer import critic_node
+from novel_assist.nodes.draft_writer import draft_writer_node
+from novel_assist.nodes.human_review_gate import human_agenda_review_gate
+from novel_assist.nodes.memory_harvester import memory_harvester_node
+from novel_assist.nodes.plot_planner import plotting_node
+from novel_assist.nodes.rag_recall import rag_recall_node
+from novel_assist.state.routing import route_after_critic
+from novel_assist.stores.factory import get_graph_store
+
+
+class ChapterService:
+    """Application service for chapter planning, review, and draft generation."""
+
+    def __init__(self) -> None:
+        self._store = get_graph_store()
+
+    def generate_plan(self, *, chapter_id: str, overrides: dict[str, Any]) -> dict[str, Any]:
+        state = build_initial_state()
+        for key, value in overrides.items():
+            if value is not None:
+                state[key] = value
+
+        state.update(
+            {
+                "chapter_id": chapter_id,
+                "agenda_review_status": "pending",
+                "agenda_review_notes": "",
+                "approved_chapter_agenda": "",
+                "approved_rag_recall_summary": "",
+                "error": "",
+            }
+        )
+
+        state.update(plotting_node(state))
+        state.update(rag_recall_node(state))
+        state["error"] = "HumanReviewRequired: 等待人工审核细纲与RAG设定。"
+
+        self._store.save_chapter_state(chapter_id=chapter_id, state=state)
+        return state
+
+    def get_review_task(self, *, chapter_id: str) -> dict[str, Any] | None:
+        return self._store.get_review_task(chapter_id=chapter_id)
+
+    def submit_review(
+        self,
+        *,
+        chapter_id: str,
+        agenda_review_status: str,
+        agenda_review_notes: str,
+        approved_chapter_agenda: str,
+        approved_rag_recall_summary: str,
+    ) -> dict[str, Any]:
+        state = self._store.get_chapter_state(chapter_id=chapter_id)
+        if not state:
+            raise KeyError(f"chapter_id not found: {chapter_id}")
+
+        state.update(
+            {
+                "chapter_id": chapter_id,
+                "agenda_review_status": agenda_review_status,
+                "agenda_review_notes": agenda_review_notes,
+                "approved_chapter_agenda": approved_chapter_agenda,
+                "approved_rag_recall_summary": approved_rag_recall_summary,
+                "enforce_state_review_status": True,
+            }
+        )
+        state.update(human_agenda_review_gate(state))
+        self._store.save_chapter_state(chapter_id=chapter_id, state=state)
+        return state
+
+    def generate_draft(self, *, chapter_id: str) -> dict[str, Any]:
+        state = self._store.get_chapter_state(chapter_id=chapter_id)
+        if not state:
+            raise KeyError(f"chapter_id not found: {chapter_id}")
+        if str(state.get("agenda_review_status", "pending")) != "approved":
+            raise PermissionError("HumanReviewRequired: 仅审核通过章节可生成初稿。")
+
+        max_rewrites = int(state.get("max_rewrites", 3))
+        for _ in range(max_rewrites + 1):
+            state.update(draft_writer_node(state))
+            state.update(critic_node(state))
+            decision = route_after_critic(state)
+            if decision == "Rejected":
+                continue
+            if decision == "Approved":
+                state.update(memory_harvester_node(state))
+            break
+
+        self._store.save_chapter_state(chapter_id=chapter_id, state=state)
+        return state
