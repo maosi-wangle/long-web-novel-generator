@@ -20,6 +20,78 @@
 - `/workbench`
 - `/docs`
 
+## 新手先看
+
+如果你是第一次跑这个项目，最重要的是先做这 4 步：
+
+1. 安装依赖
+2. 创建并填写根目录 `.env`
+3. 启动 FastAPI
+4. 打开 `/workbench`
+
+可以直接按下面的顺序照做。
+
+## 5 分钟跑起来
+
+### 第 1 步：创建虚拟环境并安装依赖
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+```
+
+### 第 2 步：复制 `.env.example` 为 `.env`
+
+项目运行时会自动读取根目录 `.env`。  
+如果没有 `.env`，很多配置不会生效。
+
+在 PowerShell 中执行：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+然后打开 `.env`，至少确认这些配置：
+
+```env
+API_HOST=127.0.0.1
+API_PORT=9005
+GRAPH_STORE_BACKEND=jsonl
+USE_MOCK_LLM=1
+```
+
+如果你只是想先把 workbench 跑起来，推荐一开始先用：
+
+```env
+USE_MOCK_LLM=1
+```
+
+这样 draft 阶段会直接返回本地 mock 文本，不需要真实模型 API。
+
+如果你要使用真实模型，再把 `.env` 改成：
+
+```env
+USE_MOCK_LLM=0
+LLM_API_KEY=你的key
+LLM_BASE_URL=https://你的接口地址/v1
+```
+
+### 第 3 步：启动服务
+
+```powershell
+python backend/src/novel_assist/cli/run_api.py
+```
+
+### 第 4 步：打开工作台
+
+浏览器访问：
+
+- `http://127.0.0.1:9005/workbench`
+- `http://127.0.0.1:9005/docs`
+
+如果你改了 `.env` 里的 `API_PORT`，这里的端口也要跟着改。
+
 ## 环境要求
 
 - Python 3.11
@@ -40,6 +112,13 @@ pip install -r backend\requirements.txt
 项目统一从根目录 `.env` 读取运行配置。
 
 可以先参考 `.env.example`，再根据你自己的环境调整 `.env`。
+
+对初学者来说，最重要的结论是：
+
+- `.env.example` 只是模板
+- 真正运行时读的是 `.env`
+- 你改配置，优先改 `.env`
+- `run_api.py` 启动时会自动加载 `.env`
 
 当前常用配置分三类。
 
@@ -137,6 +216,12 @@ USE_MOCK_LLM=0
 
 - `USE_MOCK_LLM` 会在你点击 `Generate Plan` 时写进章节 state
 - 所以切换 mock / real 之后，想让某个章节使用新模式，最好重新对该章节执行一次 `Generate Plan`
+
+如果你是第一次使用，建议：
+
+1. 先用 `USE_MOCK_LLM=1` 跑通整条 workbench 流程
+2. 确认页面、章节管理、审核流程都正常
+3. 再切到 `USE_MOCK_LLM=0` 测真实 API
 
 ## Workbench 使用流程
 
