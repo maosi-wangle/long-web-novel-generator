@@ -1,4 +1,4 @@
-from blackboard import NovelBlackboard
+from .blackboard import NovelBlackboard
 import time
 import threading
 

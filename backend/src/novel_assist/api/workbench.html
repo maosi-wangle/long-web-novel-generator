@@ -1,0 +1,1055 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novel Assist Workbench</title>
+  <style>
+    :root {
+      --bg: #f4efe8;
+      --panel: rgba(255, 251, 245, 0.92);
+      --panel-strong: rgba(255, 255, 255, 0.92);
+      --ink: #1d2530;
+      --muted: #626b77;
+      --accent: #0f6c74;
+      --accent-2: #d58f3f;
+      --line: rgba(29, 37, 48, 0.12);
+      --success: #277a41;
+      --warning: #b56a18;
+      --danger: #b43f3f;
+      --shadow: 0 20px 45px rgba(28, 38, 50, 0.10);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(15, 108, 116, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(213, 143, 63, 0.18), transparent 26%),
+        linear-gradient(160deg, #f8f3eb 0%, #eee2d3 100%);
+      min-height: 100vh;
+    }
+
+    .shell {
+      width: min(1320px, calc(100vw - 28px));
+      margin: 24px auto 40px;
+    }
+
+    .hero,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 26px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .hero-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    h1, h2, h3, h4 { margin: 0; }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .mode-toggle {
+      display: inline-flex;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(15, 108, 116, 0.08);
+      border: 1px solid rgba(15, 108, 116, 0.16);
+    }
+
+    .mode-toggle button,
+    .action {
+      font: inherit;
+      cursor: pointer;
+      border: 0;
+    }
+
+    .mode-toggle button {
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .mode-toggle button.active {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 10px 20px rgba(15, 108, 116, 0.26);
+    }
+
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid rgba(15, 108, 116, 0.18);
+      color: var(--accent);
+      background: rgba(15, 108, 116, 0.08);
+    }
+
+    .pill.success {
+      color: var(--success);
+      border-color: rgba(39, 122, 65, 0.22);
+      background: rgba(39, 122, 65, 0.10);
+    }
+
+    .pill.warning {
+      color: var(--warning);
+      border-color: rgba(181, 106, 24, 0.22);
+      background: rgba(181, 106, 24, 0.10);
+    }
+
+    .pill.danger {
+      color: var(--danger);
+      border-color: rgba(180, 63, 63, 0.22);
+      background: rgba(180, 63, 63, 0.10);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .column {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .panel-head {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .panel-note {
+      font-size: 14px;
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(29, 37, 48, 0.16);
+      background: rgba(255, 255, 255, 0.88);
+      font: inherit;
+      color: var(--ink);
+    }
+
+    textarea {
+      min-height: 88px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .action {
+      padding: 11px 14px;
+      border-radius: 14px;
+      color: white;
+      font-weight: 700;
+      background: linear-gradient(135deg, #0f6c74, #198f98);
+      box-shadow: 0 10px 20px rgba(15, 108, 116, 0.22);
+    }
+
+    .action.alt { background: linear-gradient(135deg, #55626f, #718290); }
+    .action.warn { background: linear-gradient(135deg, #a55d14, #cf7c1f); }
+    .action.subtle { background: linear-gradient(135deg, #7d4b2d, #a2653d); }
+    .action:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+      box-shadow: none;
+      filter: saturate(0.72);
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .shelf-scroll {
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 6px;
+      scrollbar-gutter: stable;
+    }
+
+    .card {
+      border: 1px solid rgba(29, 37, 48, 0.11);
+      border-radius: 18px;
+      background: var(--panel-strong);
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .card button {
+      padding: 0;
+      background: transparent;
+      border: 0;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .card.active {
+      border-color: rgba(15, 108, 116, 0.35);
+      box-shadow: 0 10px 24px rgba(15, 108, 116, 0.12);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .mono {
+      font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-radius: 16px;
+      background: rgba(18, 24, 31, 0.96);
+      color: #eef6f7;
+      padding: 15px;
+      min-height: 120px;
+      max-height: 420px;
+      overflow: auto;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .hidden-dev { display: none; }
+    body.dev-mode .hidden-dev { display: grid; }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .grid-two { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <h1>Novel Assist Stage 4 Workbench</h1>
+          <p>现在工作台除了人审流程，也能管理多部小说与各自章节。左边负责选小说、选章节、跑 plan/review/draft，右边负责看证据链、错误格式和调试日志。</p>
+        </div>
+        <div class="mode-toggle" aria-label="Mode toggle">
+          <button id="userModeBtn" class="active" type="button">使用者模式</button>
+          <button id="devModeBtn" type="button">开发者模式</button>
+        </div>
+      </div>
+      <div class="pills">
+        <span class="pill" id="modePill">MODE: USER</span>
+        <span class="pill" id="novelPill">Novel: 未选择</span>
+        <span class="pill" id="chapterPill">Chapter: 未选择</span>
+        <span class="pill" id="statusPill">Status: idle</span>
+      </div>
+    </section>
+
+    <div class="layout">
+      <div class="column">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Novel Shelf</h2>
+              <p class="panel-note">这里展示已经存在的小说。你可以先创建一部空小说，再往里面补第一章；也可以直接在生成章节计划时自动创建。</p>
+            </div>
+            <div class="actions">
+              <button class="action" id="createNovelBtn" type="button">创建小说</button>
+              <button class="action alt" id="refreshNovelsBtn" type="button">刷新小说列表</button>
+            </div>
+          </div>
+          <div class="grid-two">
+            <label>
+              Novel ID
+              <input id="novelId" value="novel-demo-ui-001">
+            </label>
+            <label>
+              Novel Title
+              <input id="novelTitle" value="演示小说 A">
+            </label>
+          </div>
+          <div id="novelList" class="list">
+            <div class="empty">还没有小说记录。你可以先创建一部空小说，或先生成一个章节计划。</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Chapter Shelf</h2>
+              <p class="panel-note">章节列表按 `chapter_number` 排序。点击一章会把它装填到下面的工作台表单里。</p>
+            </div>
+            <div class="actions">
+              <button class="action alt" id="refreshChaptersBtn" type="button">刷新章节列表</button>
+            </div>
+          </div>
+          <div id="chapterList" class="list shelf-scroll">
+            <div class="empty">先选择一部小说，或先创建该小说的第一章。</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Chapter Control</h2>
+              <p class="panel-note">这里是章节工作台。字段语义是固定的，页面只是把这些契约字段显示出来，不自己发明额外含义。</p>
+            </div>
+          </div>
+          <div class="grid-two">
+            <label>
+              Chapter ID
+              <input id="chapterId" value="chapter-demo-ui-001">
+            </label>
+            <label>
+              Chapter Number
+              <input id="chapterNumber" type="number" value="1" min="1">
+            </label>
+          </div>
+          <div class="grid-two">
+            <label>
+              Chapter Title
+              <input id="chapterTitle" value="第一章 黑市跟踪者">
+            </label>
+            <label>
+              Review Status
+              <input id="reviewStatus" value="pending" disabled>
+            </label>
+          </div>
+          <div class="grid-two">
+            <label>
+              Chapter Agenda
+              <textarea id="chapterAgenda">主角在黑市找解码师，确认自己被人跟踪。</textarea>
+            </label>
+            <label>
+              World Rules
+              <textarea id="worldRules">筑基期不能瞬移。</textarea>
+            </label>
+          </div>
+          <div class="grid-two">
+            <label>
+              Future Waypoints
+              <textarea id="futureWaypoints">跟踪者不能在本章死亡。</textarea>
+            </label>
+            <label>
+              Guidance From Future
+              <textarea id="guidanceFromFuture">跟踪者将在中后期揭示主角父亲失踪真相。</textarea>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="action alt" id="nextChapterBtn" type="button">准备下一章</button>
+            <button class="action" id="planBtn" type="button">1. Generate Plan</button>
+            <button class="action alt" id="reviewTaskBtn" type="button">2. Fetch Review Task</button>
+            <button class="action subtle hidden-dev" id="stateBtn" type="button">Inspect Raw State</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Review Desk</h2>
+              <p class="panel-note">这里模拟人工审核台。审核决定不是页面内部状态，而是明确发给后端的 `agenda_review_status` 等字段。</p>
+            </div>
+          </div>
+          <div class="grid-two">
+            <label>
+              Review Decision
+              <select id="reviewDecision">
+                <option value="approved">approved</option>
+                <option value="rejected">rejected</option>
+                <option value="edited">edited</option>
+                <option value="pending">pending</option>
+              </select>
+            </label>
+            <label>
+              Review Notes
+              <textarea id="reviewNotes">通过，进入初稿生成。</textarea>
+            </label>
+          </div>
+          <div class="grid-two">
+            <label>
+              Approved Agenda
+              <textarea id="approvedAgenda" placeholder="留空表示直接放行当前细纲"></textarea>
+            </label>
+            <label>
+              Approved Recall Summary
+              <textarea id="approvedRecallSummary" placeholder="留空表示直接放行当前召回摘要"></textarea>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="action warn" id="reviewBtn" type="button">3. Submit Review</button>
+            <button class="action" id="draftBtn" type="button">4. Generate Draft</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="column">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Evidence Cards</h2>
+              <p class="panel-note">“卡片”就是把每一条证据单独显示成一个信息块，方便区分来源、片段和分数，而不是把所有证据揉成一大段文本。</p>
+            </div>
+          </div>
+          <div id="evidenceList" class="list">
+            <div class="empty">先执行 Generate Plan 或 Fetch Review Task，再来看召回证据链。</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Draft & Critic</h2>
+              <p class="panel-note">这里看初稿正文、Critic 反馈以及统一错误返回。</p>
+            </div>
+          </div>
+          <div class="card">
+            <h4>Draft Preview</h4>
+            <p id="draftText" class="empty">还没有生成初稿。</p>
+          </div>
+          <div class="card">
+            <h4>Critic Feedback</h4>
+            <p id="criticText" class="empty">还没有 Critic 输出。</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Unified Error Format</h2>
+              <p class="panel-note">所有业务错误都尽量统一成 `error_code / message / detail / trace_id`。这样前端显示、调试和后续接入别的客户端时都更稳定。</p>
+            </div>
+          </div>
+          <div id="errorBox" class="mono">暂无错误。</div>
+        </section>
+
+        <section class="panel hidden-dev">
+          <div class="panel-head">
+            <div>
+              <h2>Developer Console</h2>
+              <p class="panel-note">开发者模式会额外显示最近一次 request/response 以及完整章节状态，方便你对照 app、service、store 逐层调试。</p>
+            </div>
+          </div>
+          <div class="card">
+            <h4>Last Request</h4>
+            <div id="requestLog" class="mono">暂无请求。</div>
+          </div>
+          <div class="card">
+            <h4>Last Response</h4>
+            <div id="responseLog" class="mono">暂无响应。</div>
+          </div>
+          <div class="card">
+            <h4>Raw Chapter State</h4>
+            <div id="stateLog" class="mono">暂无章节状态。</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const els = {
+      novelId: document.getElementById("novelId"),
+      novelTitle: document.getElementById("novelTitle"),
+      chapterId: document.getElementById("chapterId"),
+      chapterNumber: document.getElementById("chapterNumber"),
+      chapterTitle: document.getElementById("chapterTitle"),
+      reviewStatus: document.getElementById("reviewStatus"),
+      chapterAgenda: document.getElementById("chapterAgenda"),
+      worldRules: document.getElementById("worldRules"),
+      futureWaypoints: document.getElementById("futureWaypoints"),
+      guidanceFromFuture: document.getElementById("guidanceFromFuture"),
+      approvedAgenda: document.getElementById("approvedAgenda"),
+      approvedRecallSummary: document.getElementById("approvedRecallSummary"),
+      reviewDecision: document.getElementById("reviewDecision"),
+      reviewNotes: document.getElementById("reviewNotes"),
+      novelList: document.getElementById("novelList"),
+      chapterList: document.getElementById("chapterList"),
+      evidenceList: document.getElementById("evidenceList"),
+      draftText: document.getElementById("draftText"),
+      criticText: document.getElementById("criticText"),
+      errorBox: document.getElementById("errorBox"),
+      requestLog: document.getElementById("requestLog"),
+      responseLog: document.getElementById("responseLog"),
+      stateLog: document.getElementById("stateLog"),
+      modePill: document.getElementById("modePill"),
+      novelPill: document.getElementById("novelPill"),
+      chapterPill: document.getElementById("chapterPill"),
+      statusPill: document.getElementById("statusPill"),
+      userModeBtn: document.getElementById("userModeBtn"),
+      devModeBtn: document.getElementById("devModeBtn"),
+      createNovelBtn: document.getElementById("createNovelBtn"),
+      refreshNovelsBtn: document.getElementById("refreshNovelsBtn"),
+      refreshChaptersBtn: document.getElementById("refreshChaptersBtn"),
+      nextChapterBtn: document.getElementById("nextChapterBtn"),
+      planBtn: document.getElementById("planBtn"),
+      reviewTaskBtn: document.getElementById("reviewTaskBtn"),
+      stateBtn: document.getElementById("stateBtn"),
+      reviewBtn: document.getElementById("reviewBtn"),
+      draftBtn: document.getElementById("draftBtn"),
+    };
+
+    let currentMode = "user";
+    let selectedNovelId = "";
+    let selectedChapterId = "";
+    let currentChapterList = [];
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.body.classList.toggle("dev-mode", mode === "dev");
+      els.userModeBtn.classList.toggle("active", mode === "user");
+      els.devModeBtn.classList.toggle("active", mode === "dev");
+      els.modePill.textContent = `MODE: ${mode.toUpperCase()}`;
+    }
+
+    function setJson(node, value) {
+      node.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    }
+
+    function setStatus(label, tone = "") {
+      els.statusPill.textContent = `Status: ${label}`;
+      els.statusPill.className = `pill ${tone}`.trim();
+      els.novelPill.textContent = `Novel: ${els.novelId.value.trim() || "未选择"}`;
+      els.chapterPill.textContent = `Chapter: ${els.chapterId.value.trim() || "未选择"}`;
+    }
+
+    function clearError() {
+      setJson(els.errorBox, "暂无错误。");
+    }
+
+    function setTextBlock(node, value, emptyLabel) {
+      node.textContent = value || emptyLabel;
+      node.classList.toggle("empty", !value);
+    }
+
+    function syncDraftAvailability(status = els.reviewStatus.value) {
+      const canDraft = Boolean(els.chapterId.value.trim()) && String(status || "").trim() === "approved";
+      els.draftBtn.disabled = !canDraft;
+      els.draftBtn.title = canDraft ? "" : "Draft generation requires an approved review.";
+    }
+
+    function renderEvidence(items) {
+      if (!items || items.length === 0) {
+        els.evidenceList.innerHTML = '<div class="empty">还没有召回证据。</div>';
+        return;
+      }
+
+      els.evidenceList.innerHTML = items.map((item) => `
+        <article class="card">
+          <div class="card-title">${item.title || "Untitled Evidence"}</div>
+          <p>${item.snippet || ""}</p>
+          <div class="meta">
+            <span>source_id: ${item.source_id || ""}</span>
+            <span>score: ${item.score ?? ""}</span>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function clearChapterWorkspace() {
+      selectedChapterId = "";
+      els.chapterId.value = "";
+      els.chapterNumber.value = 1;
+      els.chapterTitle.value = "";
+      els.chapterAgenda.value = "";
+      els.worldRules.value = "";
+      els.futureWaypoints.value = "";
+      els.guidanceFromFuture.value = "";
+      els.reviewStatus.value = "pending";
+      els.reviewDecision.value = "approved";
+      els.reviewNotes.value = "通过，进入初稿生成。";
+      els.approvedAgenda.value = "";
+      els.approvedRecallSummary.value = "";
+      renderEvidence([]);
+      setTextBlock(els.draftText, "", "还没有生成初稿。");
+      setTextBlock(els.criticText, "", "还没有 Critic 输出。");
+      setJson(els.stateLog, "暂无章节状态。");
+      syncDraftAvailability("pending");
+    }
+
+    function applyNovelSelection(novel) {
+      selectedNovelId = novel.novel_id || "";
+      els.novelId.value = novel.novel_id || "";
+      els.novelTitle.value = novel.novel_title || "";
+      clearChapterWorkspace();
+      setStatus("novel-selected");
+      loadChapters(selectedNovelId).catch(() => null);
+    }
+
+    function applyChapterSelection(chapter) {
+      selectedChapterId = chapter.chapter_id || "";
+      els.chapterId.value = chapter.chapter_id || "";
+      els.chapterNumber.value = chapter.chapter_number ?? 1;
+      els.chapterTitle.value = chapter.chapter_title || "";
+      els.reviewStatus.value = chapter.agenda_review_status || "pending";
+      if (chapter.novel_id) {
+        els.novelId.value = chapter.novel_id;
+        selectedNovelId = chapter.novel_id;
+      }
+      if (chapter.novel_title) {
+        els.novelTitle.value = chapter.novel_title;
+      }
+      syncDraftAvailability(els.reviewStatus.value);
+      setStatus("chapter-selected");
+      fetchState().catch(() => null);
+    }
+
+    function renderNovels(novels) {
+      if (!novels || novels.length === 0) {
+        els.novelList.innerHTML = '<div class="empty">还没有小说记录。你可以先创建一部空小说，或先生成一个章节计划。</div>';
+        return;
+      }
+
+      els.novelList.innerHTML = novels.map((novel) => `
+        <article class="card ${novel.novel_id === selectedNovelId ? "active" : ""}">
+          <button type="button" data-novel-id="${novel.novel_id}">
+            <div class="card-title">${novel.novel_title || novel.novel_id}</div>
+            <div class="meta">
+              <span>novel_id: ${novel.novel_id}</span>
+              <span>chapters: ${novel.chapter_count ?? 0}</span>
+            </div>
+            <div class="meta">
+              <span>latest: ${novel.latest_chapter_title || novel.latest_chapter_id || "暂无"}</span>
+            </div>
+          </button>
+        </article>
+      `).join("");
+
+      els.novelList.querySelectorAll("button[data-novel-id]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const novel = novels.find((item) => item.novel_id === button.dataset.novelId);
+          if (novel) {
+            applyNovelSelection(novel);
+          }
+        });
+      });
+    }
+
+    function renderChapters(chapters) {
+      currentChapterList = Array.isArray(chapters) ? chapters : [];
+      if (!chapters || chapters.length === 0) {
+        els.chapterList.innerHTML = '<div class="empty">当前小说下还没有章节。先用下方表单生成一章计划。</div>';
+        return;
+      }
+
+      els.chapterList.innerHTML = chapters.map((chapter) => `
+        <article class="card ${chapter.chapter_id === selectedChapterId ? "active" : ""}">
+          <button type="button" data-chapter-id="${chapter.chapter_id}">
+            <div class="card-title">第 ${chapter.chapter_number ?? "?"} 章 ${chapter.chapter_title || chapter.chapter_id}</div>
+            <div class="meta">
+              <span>chapter_id: ${chapter.chapter_id}</span>
+              <span>status: ${chapter.chapter_status || "unknown"}</span>
+            </div>
+            <div class="meta">
+              <span>review: ${chapter.agenda_review_status || "pending"}</span>
+              <span>draft_words: ${chapter.draft_word_count ?? 0}</span>
+            </div>
+          </button>
+        </article>
+      `).join("");
+
+      els.chapterList.querySelectorAll("button[data-chapter-id]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const chapter = chapters.find((item) => item.chapter_id === button.dataset.chapterId);
+          if (chapter) {
+            applyChapterSelection(chapter);
+          }
+        });
+      });
+    }
+
+    async function apiRequest({ method, path, body }) {
+      const url = `${window.location.origin}${path}`;
+      const requestInfo = { method, url, body: body || null };
+      setJson(els.requestLog, requestInfo);
+
+      const options = { method, headers: {} };
+      if (body) {
+        options.headers["Content-Type"] = "application/json; charset=utf-8";
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, options);
+      const contentType = response.headers.get("content-type") || "";
+      const data = contentType.includes("application/json") ? await response.json() : await response.text();
+      setJson(els.responseLog, data);
+      if (!response.ok) {
+        setJson(els.errorBox, data);
+        throw data;
+      }
+      clearError();
+      return data;
+    }
+
+    function buildNextChapterId(baseChapterId, novelId, chapterNumber) {
+      const normalizedNovelId = novelId || "novel";
+      const fallback = `${normalizedNovelId}-chapter-${String(chapterNumber).padStart(3, "0")}`;
+      if (!baseChapterId) {
+        return fallback;
+      }
+
+      const matched = baseChapterId.match(/^(.*?)(\d+)$/);
+      if (!matched) {
+        return fallback;
+      }
+
+      const prefix = matched[1];
+      const width = matched[2].length;
+      return `${prefix}${String(chapterNumber).padStart(width, "0")}`;
+    }
+
+    async function loadNovels() {
+      const data = await apiRequest({ method: "GET", path: "/novels" });
+      renderNovels(data.novels || []);
+      return data;
+    }
+
+    async function loadChapters(novelId = els.novelId.value.trim()) {
+      if (!novelId) {
+        renderChapters([]);
+        return { novel_id: "", chapters: [] };
+      }
+      const data = await apiRequest({ method: "GET", path: `/novels/${encodeURIComponent(novelId)}/chapters` });
+      renderChapters(data.chapters || []);
+      return data;
+    }
+
+    function applyReviewTask(task) {
+      els.reviewStatus.value = task.agenda_review_status || "pending";
+      els.reviewDecision.value = task.agenda_review_status || "pending";
+      els.reviewNotes.value = task.agenda_review_notes || "";
+      els.approvedAgenda.value = task.approved_chapter_agenda || "";
+      els.approvedRecallSummary.value = task.approved_rag_recall_summary || "";
+      renderEvidence(task.rag_evidence || []);
+      syncDraftAvailability(task.agenda_review_status || "pending");
+      setStatus(task.agenda_review_status || "pending", task.audit_warning ? "warning" : "");
+      setJson(els.responseLog, task);
+      if (task.audit_warning) {
+        setJson(els.errorBox, task.audit_warning);
+      }
+    }
+
+    function applyDraft(data) {
+      els.reviewStatus.value = data.agenda_review_status || els.reviewStatus.value;
+      setTextBlock(els.draftText, data.draft, "还没有生成初稿。");
+      setTextBlock(els.criticText, data.critic_feedback, "还没有 Critic 输出。");
+      syncDraftAvailability(els.reviewStatus.value);
+      setStatus(data.error ? "draft-error" : "draft-ready", data.error ? "danger" : "success");
+      if (data.error) {
+        setJson(els.errorBox, data.error);
+      }
+    }
+
+    function applyChapterState(payload) {
+      const state = payload?.state;
+      if (!state) {
+        return;
+      }
+
+      selectedNovelId = state.novel_id || selectedNovelId;
+      selectedChapterId = state.chapter_id || selectedChapterId;
+      els.novelId.value = state.novel_id || els.novelId.value;
+      els.novelTitle.value = state.novel_title || els.novelTitle.value;
+      els.chapterId.value = state.chapter_id || els.chapterId.value;
+      els.chapterNumber.value = state.chapter_number ?? els.chapterNumber.value;
+      els.chapterTitle.value = state.chapter_title || els.chapterTitle.value;
+      els.chapterAgenda.value = state.chapter_agenda || "";
+      els.worldRules.value = state.world_rules || "";
+      els.futureWaypoints.value = state.future_waypoints || "";
+      els.guidanceFromFuture.value = state.guidance_from_future || "";
+      els.reviewStatus.value = state.agenda_review_status || "pending";
+      els.reviewDecision.value = state.agenda_review_status || "pending";
+      els.reviewNotes.value = state.agenda_review_notes || "";
+      els.approvedAgenda.value = state.approved_chapter_agenda || "";
+      els.approvedRecallSummary.value = state.approved_rag_recall_summary || "";
+      renderEvidence(state.rag_evidence || []);
+      setTextBlock(els.draftText, state.draft, "还没有生成初稿。");
+      setTextBlock(els.criticText, state.critic_feedback, "还没有 Critic 输出。");
+      syncDraftAvailability(state.agenda_review_status || "pending");
+    }
+
+    async function fetchState() {
+      const chapterId = els.chapterId.value.trim();
+      if (!chapterId) {
+        return null;
+      }
+      const data = await apiRequest({ method: "GET", path: `/chapters/${encodeURIComponent(chapterId)}/state` });
+      setJson(els.stateLog, data);
+      applyChapterState(data);
+      return data;
+    }
+
+    els.userModeBtn.addEventListener("click", () => setMode("user"));
+    els.devModeBtn.addEventListener("click", () => setMode("dev"));
+
+    els.createNovelBtn.addEventListener("click", async () => {
+      setStatus("creating-novel");
+      try {
+        const novel = await apiRequest({
+          method: "POST",
+          path: "/novels",
+          body: {
+            novel_id: els.novelId.value.trim(),
+            novel_title: els.novelTitle.value.trim(),
+          },
+        });
+        selectedNovelId = novel.novel_id || "";
+        clearChapterWorkspace();
+        await loadNovels().catch(() => null);
+        await loadChapters(selectedNovelId).catch(() => null);
+        setStatus("novel-created", "success");
+      } catch (_) {
+        setStatus("create-novel-error", "danger");
+      }
+    });
+
+    els.refreshNovelsBtn.addEventListener("click", async () => {
+      setStatus("loading-novels");
+      try {
+        await loadNovels();
+        setStatus("novels-ready");
+      } catch (_) {
+        setStatus("novels-error", "danger");
+      }
+    });
+
+    els.refreshChaptersBtn.addEventListener("click", async () => {
+      setStatus("loading-chapters");
+      try {
+        await loadChapters();
+        setStatus("chapters-ready");
+      } catch (_) {
+        setStatus("chapters-error", "danger");
+      }
+    });
+
+    els.nextChapterBtn.addEventListener("click", async () => {
+      const novelId = els.novelId.value.trim();
+      if (!novelId) {
+        setJson(els.errorBox, {
+          error_code: "NOVEL_REQUIRED",
+          message: "Prepare Next Chapter requires a selected novel.",
+        });
+        setStatus("next-chapter-error", "danger");
+        return;
+      }
+
+      setStatus("preparing-next-chapter");
+      try {
+        let baseChapterId = "";
+        let baseChapterNumber = 0;
+
+        if (currentChapterList.length > 0) {
+          const latestChapter = currentChapterList[currentChapterList.length - 1];
+          applyChapterSelection(latestChapter);
+          const latestState = await fetchState().catch(() => null);
+          baseChapterId = String(latestState?.state?.chapter_id || latestChapter.chapter_id || "");
+          baseChapterNumber = Number(latestState?.state?.chapter_number || latestChapter.chapter_number || 0);
+        } else {
+          clearChapterWorkspace();
+        }
+
+        const nextChapterNumber = Math.max(baseChapterNumber + 1, 1);
+        const nextChapterId = buildNextChapterId(baseChapterId, novelId, nextChapterNumber);
+        selectedChapterId = nextChapterId;
+        els.chapterId.value = nextChapterId;
+        els.chapterNumber.value = nextChapterNumber;
+        els.chapterTitle.value = `第${nextChapterNumber}章`;
+        els.chapterAgenda.value = "";
+        els.reviewStatus.value = "pending";
+        els.reviewDecision.value = "approved";
+        els.reviewNotes.value = "通过，进入初稿生成。";
+        els.approvedAgenda.value = "";
+        els.approvedRecallSummary.value = "";
+        renderEvidence([]);
+        setTextBlock(els.draftText, "", "还没有生成初稿。");
+        setTextBlock(els.criticText, "", "还没有 Critic 输出。");
+        setJson(els.stateLog, "暂无章节状态。");
+        clearError();
+        syncDraftAvailability("pending");
+        setStatus("next-chapter-ready", "warning");
+      } catch (_) {
+        setStatus("next-chapter-error", "danger");
+      }
+    });
+
+    els.planBtn.addEventListener("click", async () => {
+      const chapterId = els.chapterId.value.trim();
+      setStatus("planning");
+      try {
+        const data = await apiRequest({
+          method: "POST",
+          path: `/chapters/${encodeURIComponent(chapterId)}/plan`,
+          body: {
+            novel_id: els.novelId.value.trim(),
+            novel_title: els.novelTitle.value.trim(),
+            chapter_number: Number(els.chapterNumber.value || 1),
+            chapter_title: els.chapterTitle.value.trim(),
+            chapter_agenda: els.chapterAgenda.value,
+            world_rules: els.worldRules.value,
+            future_waypoints: els.futureWaypoints.value,
+            guidance_from_future: els.guidanceFromFuture.value,
+          },
+        });
+        selectedNovelId = data.novel_id || selectedNovelId;
+        selectedChapterId = data.chapter_id || selectedChapterId;
+        els.reviewStatus.value = data.agenda_review_status || "pending";
+        renderEvidence(data.rag_evidence || []);
+        syncDraftAvailability(data.agenda_review_status || "pending");
+        setStatus("review-pending", "warning");
+        await loadNovels().catch(() => null);
+        await loadChapters(els.novelId.value.trim()).catch(() => null);
+        await fetchState().catch(() => null);
+      } catch (_) {
+        setStatus("plan-error", "danger");
+      }
+    });
+
+    els.reviewTaskBtn.addEventListener("click", async () => {
+      const chapterId = els.chapterId.value.trim();
+      setStatus("loading-review-task");
+      try {
+        const task = await apiRequest({ method: "GET", path: `/chapters/${encodeURIComponent(chapterId)}/review-task` });
+        applyReviewTask(task);
+        await fetchState().catch(() => null);
+      } catch (_) {
+        setStatus("review-task-error", "danger");
+      }
+    });
+
+    els.reviewBtn.addEventListener("click", async () => {
+      const chapterId = els.chapterId.value.trim();
+      setStatus("submitting-review");
+      try {
+        const data = await apiRequest({
+          method: "POST",
+          path: `/chapters/${encodeURIComponent(chapterId)}/review`,
+          body: {
+            agenda_review_status: els.reviewDecision.value,
+            agenda_review_notes: els.reviewNotes.value,
+            approved_chapter_agenda: els.approvedAgenda.value,
+            approved_rag_recall_summary: els.approvedRecallSummary.value,
+          },
+        });
+        els.reviewStatus.value = data.agenda_review_status || "";
+        syncDraftAvailability(data.agenda_review_status || "");
+        setStatus(data.agenda_review_status || "reviewed", data.agenda_review_status === "approved" ? "success" : "warning");
+        await loadChapters(els.novelId.value.trim()).catch(() => null);
+        await fetchState().catch(() => null);
+      } catch (_) {
+        setStatus("review-error", "danger");
+      }
+    });
+
+    els.draftBtn.addEventListener("click", async () => {
+      const chapterId = els.chapterId.value.trim();
+      setStatus("drafting");
+      try {
+        const data = await apiRequest({ method: "POST", path: `/chapters/${encodeURIComponent(chapterId)}/draft` });
+        applyDraft(data);
+        await loadChapters(els.novelId.value.trim()).catch(() => null);
+        await fetchState().catch(() => null);
+      } catch (_) {
+        setStatus("draft-error", "danger");
+      }
+    });
+
+    els.stateBtn.addEventListener("click", async () => {
+      setStatus("loading-state");
+      try {
+        await fetchState();
+        setStatus("state-ready");
+      } catch (_) {
+        setStatus("state-error", "danger");
+      }
+    });
+
+    setMode("user");
+    setStatus("idle");
+    clearError();
+    syncDraftAvailability();
+    loadNovels().catch(() => null);
+  </script>
+</body>
+</html>
