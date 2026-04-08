@@ -23,6 +23,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         os.environ["GRAPH_STORE_BACKEND"] = "jsonl"
         os.environ["CHAPTER_STATE_PATH"] = str(Path(self._tmp_dir.name) / "chapter_state.json")
         os.environ["REVIEW_AUDIT_PATH"] = str(Path(self._tmp_dir.name) / "review_audit.jsonl")
+        os.environ["NOVEL_STATE_PATH"] = str(Path(self._tmp_dir.name) / "novel_state.json")
         os.environ.pop("HUMAN_REVIEW_STATUS", None)
         os.environ.pop("AUTO_APPROVE_REVIEW", None)
         self.client = TestClient(app)
@@ -39,6 +40,8 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         self.assertEqual(workbench_resp.status_code, 200)
         self.assertIn("Novel Assist Stage 4 Workbench", workbench_resp.text)
         self.assertIn("Novel Shelf", workbench_resp.text)
+        self.assertIn("创建小说", workbench_resp.text)
+        self.assertIn("准备下一章", workbench_resp.text)
 
         plan_resp = self.client.post(
             f"/chapters/{chapter_id}/plan",
@@ -155,6 +158,97 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         self.assertEqual(empty_chapters_resp.status_code, 200)
         self.assertEqual(empty_chapters_resp.json()["chapters"], [])
 
+    def test_create_empty_novel_and_keep_it_visible(self) -> None:
+        create_resp = self.client.post(
+            "/novels",
+            json={
+                "novel_id": "novel-empty",
+                "novel_title": "空白小说",
+            },
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        create_data = create_resp.json()
+        self.assertEqual(create_data["novel_id"], "novel-empty")
+        self.assertEqual(create_data["novel_title"], "空白小说")
+        self.assertEqual(create_data["chapter_count"], 0)
+
+        novels_resp = self.client.get("/novels")
+        self.assertEqual(novels_resp.status_code, 200)
+        novel_index = {item["novel_id"]: item for item in novels_resp.json()["novels"]}
+        self.assertIn("novel-empty", novel_index)
+        self.assertEqual(novel_index["novel-empty"]["chapter_count"], 0)
+        self.assertEqual(novel_index["novel-empty"]["latest_chapter_id"], "")
+
+        chapters_resp = self.client.get("/novels/novel-empty/chapters")
+        self.assertEqual(chapters_resp.status_code, 200)
+        chapters_data = chapters_resp.json()
+        self.assertEqual(chapters_data["novel_title"], "空白小说")
+        self.assertEqual(chapters_data["chapters"], [])
+
+        duplicate_resp = self.client.post(
+            "/novels",
+            json={
+                "novel_id": "novel-empty",
+                "novel_title": "重复标题",
+            },
+        )
+        self.assertEqual(duplicate_resp.status_code, 409)
+        self.assertEqual(duplicate_resp.json()["error_code"], "NOVEL_ALREADY_EXISTS")
+
+    def test_next_chapter_plan_inherits_previous_chapter_context(self) -> None:
+        first_chapter_id = "chapter-seq-001"
+        second_chapter_id = "chapter-seq-002"
+
+        first_plan = self.client.post(
+            f"/chapters/{first_chapter_id}/plan",
+            json={
+                "novel_id": "novel-seq",
+                "novel_title": "连续章节小说",
+                "chapter_number": 1,
+                "chapter_title": "第一章",
+                "world_rules": "灵气运转必须遵循经脉，不可越阶瞬发。",
+                "future_waypoints": "反派不能在前十章暴露真实身份。",
+                "guidance_from_future": "第二章必须延续第一章结尾的追逐。",
+            },
+        )
+        self.assertEqual(first_plan.status_code, 200)
+
+        review_resp = self.client.post(
+            f"/chapters/{first_chapter_id}/review",
+            json={
+                "agenda_review_status": "approved",
+                "agenda_review_notes": "通过。",
+                "approved_chapter_agenda": "",
+                "approved_rag_recall_summary": "",
+            },
+        )
+        self.assertEqual(review_resp.status_code, 200)
+
+        draft_resp = self.client.post(f"/chapters/{first_chapter_id}/draft")
+        self.assertEqual(draft_resp.status_code, 200)
+        first_state_resp = self.client.get(f"/chapters/{first_chapter_id}/state")
+        first_state = first_state_resp.json()["state"]
+
+        second_plan = self.client.post(
+            f"/chapters/{second_chapter_id}/plan",
+            json={
+                "novel_id": "novel-seq",
+                "chapter_number": 2,
+                "chapter_agenda": "主角沿着第一章留下的线索追查到旧港口。",
+            },
+        )
+        self.assertEqual(second_plan.status_code, 200)
+        second_plan_data = second_plan.json()
+        self.assertEqual(second_plan_data["chapter_title"], "第2章")
+
+        second_state_resp = self.client.get(f"/chapters/{second_chapter_id}/state")
+        second_state = second_state_resp.json()["state"]
+        self.assertEqual(second_state["novel_title"], "连续章节小说")
+        self.assertEqual(second_state["previous_chapter_ending"], first_state["previous_chapter_ending"])
+        self.assertEqual(second_state["world_rules"], first_state["world_rules"])
+        self.assertEqual(second_state["future_waypoints"], first_state["future_waypoints"])
+        self.assertEqual(second_state["guidance_from_future"], first_state["guidance_from_future"])
+
     def test_uniform_error_payloads(self) -> None:
         missing_resp = self.client.get("/chapters/not-found/review-task")
         self.assertEqual(missing_resp.status_code, 404)
@@ -166,6 +260,13 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(invalid_review.status_code, 422)
         self.assertEqual(invalid_review.json()["error_code"], "REQUEST_VALIDATION_ERROR")
+
+        invalid_novel = self.client.post(
+            "/novels",
+            json={"novel_id": "   ", "novel_title": ""},
+        )
+        self.assertEqual(invalid_novel.status_code, 422)
+        self.assertEqual(invalid_novel.json()["error_code"], "REQUEST_VALIDATION_ERROR")
 
 
 if __name__ == "__main__":

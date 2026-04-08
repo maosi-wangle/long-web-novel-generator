@@ -124,6 +124,12 @@ class Neo4jGraphStore(GraphStore):
     def get_review_task(self, *, chapter_id: str) -> dict[str, Any] | None:
         return self._fallback.get_review_task(chapter_id=chapter_id)
 
+    def create_novel(self, *, novel_id: str, novel_title: str) -> dict[str, Any]:
+        return self._fallback.create_novel(novel_id=novel_id, novel_title=novel_title)
+
+    def get_novel(self, *, novel_id: str) -> dict[str, Any] | None:
+        return self._fallback.get_novel(novel_id=novel_id)
+
     def list_novels(self) -> list[dict[str, Any]]:
         return self._fallback.list_novels()
 

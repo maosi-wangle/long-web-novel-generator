@@ -27,6 +27,63 @@ class ChapterService:
         state["chapter_title"] = str(state.get("chapter_title") or chapter_id)
         state["chapter_number"] = int(state.get("chapter_number") or 1)
 
+    @staticmethod
+    def _default_chapter_title(chapter_number: int) -> str:
+        return f"第{chapter_number}章"
+
+    def _find_previous_chapter_state(self, *, novel_id: str, chapter_number: int) -> dict[str, Any] | None:
+        if chapter_number <= 1:
+            return None
+
+        previous_candidates = [
+            item
+            for item in self._store.list_chapters(novel_id=novel_id)
+            if isinstance(item.get("chapter_number"), int) and int(item["chapter_number"]) < chapter_number
+        ]
+        if not previous_candidates:
+            return None
+
+        previous_summary = previous_candidates[-1]
+        previous_chapter_id = str(previous_summary.get("chapter_id", ""))
+        if not previous_chapter_id:
+            return None
+        return self._store.get_chapter_state(chapter_id=previous_chapter_id)
+
+    @staticmethod
+    def _ending_for_next_chapter(previous_state: dict[str, Any]) -> str:
+        draft = str(previous_state.get("draft", ""))
+        if draft:
+            return draft[-200:]
+        return str(previous_state.get("previous_chapter_ending", ""))
+
+    def _inherit_previous_chapter_context(self, *, state: dict[str, Any], overrides: dict[str, Any]) -> None:
+        previous_state = self._find_previous_chapter_state(
+            novel_id=str(state.get("novel_id", "")),
+            chapter_number=int(state.get("chapter_number", 1) or 1),
+        )
+        if not previous_state:
+            if overrides.get("chapter_title") is None:
+                state["chapter_title"] = self._default_chapter_title(int(state.get("chapter_number", 1) or 1))
+            return
+
+        inherited_values = {
+            "novel_title": str(previous_state.get("novel_title", "")),
+            "global_outline": str(previous_state.get("global_outline", "")),
+            "current_arc": str(previous_state.get("current_arc", "")),
+            "memory_l0": str(previous_state.get("memory_l0", "")),
+            "previous_chapter_ending": self._ending_for_next_chapter(previous_state),
+            "world_rules": str(previous_state.get("world_rules", "")),
+            "future_waypoints": str(previous_state.get("future_waypoints", "")),
+            "guidance_from_future": str(previous_state.get("guidance_from_future", "")),
+        }
+
+        for key, value in inherited_values.items():
+            if overrides.get(key) is None and value:
+                state[key] = value
+
+        if overrides.get("chapter_title") is None:
+            state["chapter_title"] = self._default_chapter_title(int(state.get("chapter_number", 1) or 1))
+
     def generate_plan(self, *, chapter_id: str, overrides: dict[str, Any]) -> dict[str, Any]:
         state = build_initial_state()
         for key, value in overrides.items():
@@ -34,6 +91,7 @@ class ChapterService:
                 state[key] = value
 
         self._coerce_metadata(state, chapter_id=chapter_id)
+        self._inherit_previous_chapter_context(state=state, overrides=overrides)
         state.update(
             {
                 "agenda_review_status": "pending",
@@ -58,6 +116,9 @@ class ChapterService:
     def get_chapter_state(self, *, chapter_id: str) -> dict[str, Any] | None:
         return self._store.get_chapter_state(chapter_id=chapter_id)
 
+    def create_novel(self, *, novel_id: str, novel_title: str) -> dict[str, Any]:
+        return self._store.create_novel(novel_id=novel_id, novel_title=novel_title)
+
     def list_novels(self) -> list[dict[str, Any]]:
         return self._store.list_novels()
 
@@ -66,6 +127,10 @@ class ChapterService:
         novel_title = ""
         if chapters:
             novel_title = str(chapters[0].get("novel_title", ""))
+        else:
+            novel = self._store.get_novel(novel_id=novel_id)
+            if novel:
+                novel_title = str(novel.get("novel_title", ""))
         return {
             "novel_id": novel_id,
             "novel_title": novel_title,

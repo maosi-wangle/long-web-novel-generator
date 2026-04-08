@@ -2,11 +2,27 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
 
 # 敏感配置与密钥
 .env
+.env.*
+!.env.example
 auth.json
-*.toml
 
 # 杂项
 .DS_Store
+
+# 运行期状态 / 本地数据库快照
+backend/runtime/*.json
+backend/runtime/*.jsonl
+*.db
+*.sqlite3

@@ -24,6 +24,7 @@
 - `GET /healthz`
 - `GET /workbench`
 - `GET /novels`
+- `POST /novels`
 - `GET /novels/{novel_id}/chapters`
 - `POST /chapters/{chapter_id}/plan`
 - `GET /chapters/{chapter_id}/review-task`
@@ -62,15 +63,18 @@
 1. `build_initial_state()`
 2. 用请求体 `overrides` 覆盖默认状态
 3. `_coerce_metadata(...)` 补齐小说/章节元数据
-4. 调 `plotting_node(state)`
-5. 调 `rag_recall_node(state)`
-6. 设置 `agenda_review_status = pending`
-7. 落盘到 store
+4. 如为续章，则从同小说上一章继承连续性字段
+5. 调 `plotting_node(state)`
+6. 调 `rag_recall_node(state)`
+7. 设置 `agenda_review_status = pending`
+8. 落盘到 store
 
 重点看：
 
 - 这里不是跑完整 LangGraph `invoke()`，而是手动执行阶段四需要的前半段节点。
 - `novel_id / novel_title / chapter_number / chapter_title` 在这里被整理成统一元数据。
+- 当新章节的 `chapter_number > 1` 时，service 会尝试自动继承上一章的 `previous_chapter_ending` 以及设定字段，保证续章时不是又从 demo 默认值起步。
+- `build_initial_state()` 还会把 `USE_MOCK_LLM / LLM_MODEL_NAME / LLM_TEMPERATURE` 读进 state，所以“mock 还是 real”是在生成计划时写进章节状态的。
 - `chapter_status` 在这里会进入 `review_pending`，方便章节管理面板显示当前阶段。
 
 ### 2.2 `submit_review`
@@ -109,12 +113,14 @@
 
 ### 2.4 新增的管理方法
 
+- `create_novel(...)`
 - `list_novels()`
 - `list_chapters(novel_id=...)`
 
 作用：
 
-- 这两个方法把底层 store 聚合出来的数据，直接提供给前端工作台做“多小说 + 章节管理”。
+- `create_novel(...)` 负责先创建一部还没有章节的小说。
+- 这几个方法把底层 store 聚合出来的数据，直接提供给前端工作台做“多小说 + 章节管理”。
 
 ---
 
@@ -173,12 +179,13 @@
 
 ### 3.4 多小说管理合同
 
+- `CreateNovelRequest`
 - `NovelSummary`
 - `NovelListResponse`
 - `ChapterSummary`
 - `ChapterListResponse`
 
-这四个模型是本次新增的重点。
+这几组模型是本次新增的重点。
 
 你读的时候要注意：
 
@@ -206,6 +213,8 @@
 
 这次新增的方法：
 
+- `create_novel(...)`
+- `get_novel(...)`
 - `list_novels()`
 - `list_chapters(novel_id=...)`
 
@@ -217,17 +226,23 @@
 
 建议重点读这些方法：
 
+- `_read_novel_map()`
+- `_write_novel_map()`
+- `create_novel(...)`
 - `_read_state_map()`
 - `_write_state_map()`
 - `save_chapter_state(...)`
 - `get_review_task(...)`
+- `get_novel(...)`
 - `list_novels()`
 - `list_chapters(...)`
 
 你要理解的逻辑：
 
 - `chapter_state.json` 仍然是以 `chapter_id` 为主键存整章状态。
+- `novel_state.json` 负责保存“小说已经存在”这件事，所以空小说也能显示出来。
 - 多小说管理不是新建一套复杂数据库，而是从现有章节状态里聚合视图。
+- `create_novel(...)` 先写小说级索引；`save_chapter_state(...)` 也会顺手 upsert 小说索引，保证直接创建章节时小说照样会出现。
 - `list_novels()` 做的是“按 `novel_id` 分组”，统计章节数、最近章节等摘要。
 - `list_chapters()` 做的是“筛出某小说下的章节”，再按 `chapter_number` 排序。
 
@@ -310,14 +325,23 @@
 - 错误统一展示
 - 请求/响应/state 调试
 
+其中：
+
+- `Chapter Shelf` 在章节很多时使用内部滚动，避免章节卡片把整页无限撑长
+
 ### 6.2 再看 JS 状态流
 
 重点函数：
 
+- `clearChapterWorkspace()`
 - `loadNovels()`
 - `loadChapters(...)`
+- `createNovelBtn` 对应的点击处理
+- `nextChapterBtn` 对应的点击处理
 - `applyNovelSelection(...)`
 - `applyChapterSelection(...)`
+- `applyChapterState(...)`
+- `syncDraftAvailability(...)`
 - `apiRequest(...)`
 - `fetchState()`
 - `renderEvidence(...)`
@@ -325,8 +349,13 @@
 你要理解的点：
 
 - 小说和章节现在都以“卡片列表”显示
+- `Novel Shelf` 不只是展示列表，也负责触发 `POST /novels`
 - 点击小说卡会触发加载章节列表
-- 点击章节卡会把该章节信息装填到工作台输入框
+- 切换小说时会先清掉当前章节选择和章节输出区，避免上一章残留在界面上
+- 点击章节卡会先切换当前章节，再通过 `/state` 把已保存字段回填到工作台输入框
+- `准备下一章` 会以当前小说的最后一章为基准，自动递增章节号与章节 ID
+- `Fetch Review Task` 不只是拉证据，也会同步回填审核备注和已批准字段
+- `Generate Draft` 的按钮可用性应和 `agenda_review_status` 绑定，而不只是依赖服务端报错兜底
 - `apiRequest(...)` 是统一请求入口，顺便把最后一次 request/response 打到开发者面板里
 
 ### 6.3 为什么叫“卡片”

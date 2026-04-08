@@ -2,7 +2,20 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+class CreateNovelRequest(BaseModel):
+    novel_id: str = Field(description="小说 ID。")
+    novel_title: str = Field(description="小说标题。")
+
+    @field_validator("novel_id", "novel_title")
+    @classmethod
+    def ensure_non_blank(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Value cannot be blank.")
+        return cleaned
 
 
 class PlanRequest(BaseModel):

@@ -7,7 +7,7 @@ API startup flow (local development):
    - API_HOST (default: 127.0.0.1)
    - API_PORT (default: 8000)
    - GRAPH_STORE_BACKEND (jsonl or neo4j)
-   - REVIEW_AUDIT_PATH / CHAPTER_STATE_PATH
+   - REVIEW_AUDIT_PATH / CHAPTER_STATE_PATH / NOVEL_STATE_PATH
 
 2. Start server from repo root:
    python backend/src/novel_assist/cli/run_api.py
@@ -27,6 +27,7 @@ API startup flow (local development):
 
 from pathlib import Path
 
+from fastapi.encoders import jsonable_encoder
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -36,8 +37,10 @@ from novel_assist.api.schemas import (
     ApiErrorResponse,
     ChapterListResponse,
     ChapterStateResponse,
+    CreateNovelRequest,
     DraftResponse,
     NovelListResponse,
+    NovelSummary,
     PlanRequest,
     PlanResponse,
     ReviewRequest,
@@ -97,7 +100,7 @@ async def handle_validation_error(_: Request, exc: RequestValidationError) -> JS
     payload = ApiErrorResponse(
         error_code="REQUEST_VALIDATION_ERROR",
         message="Request validation failed.",
-        detail=exc.errors(),
+        detail=jsonable_encoder(exc.errors()),
     )
     return JSONResponse(status_code=422, content=payload.model_dump())
 
@@ -112,6 +115,7 @@ def root() -> dict[str, object]:
         "workbench": "/workbench",
         "endpoints": [
             "GET /novels",
+            "POST /novels",
             "GET /novels/{novel_id}/chapters",
             "POST /chapters/{chapter_id}/plan",
             "GET /chapters/{chapter_id}/review-task",
@@ -136,6 +140,22 @@ def workbench() -> HTMLResponse:
 def list_novels() -> NovelListResponse:
     service = ChapterService()
     return NovelListResponse(novels=service.list_novels())
+
+
+@app.post("/novels", response_model=NovelSummary)
+def create_novel(payload: CreateNovelRequest) -> NovelSummary:
+    service = ChapterService()
+    try:
+        novel = service.create_novel(novel_id=payload.novel_id, novel_title=payload.novel_title)
+    except FileExistsError as exc:
+        raise ApiErrorException(
+            status_code=409,
+            error_code="NOVEL_ALREADY_EXISTS",
+            message="Novel already exists.",
+            detail={"novel_id": payload.novel_id, "reason": str(exc)},
+        ) from exc
+
+    return NovelSummary(**novel)
 
 
 @app.get("/novels/{novel_id}/chapters", response_model=ChapterListResponse)

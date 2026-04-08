@@ -219,10 +219,23 @@
     .action.alt { background: linear-gradient(135deg, #55626f, #718290); }
     .action.warn { background: linear-gradient(135deg, #a55d14, #cf7c1f); }
     .action.subtle { background: linear-gradient(135deg, #7d4b2d, #a2653d); }
+    .action:disabled {
+      cursor: not-allowed;
+      opacity: 0.58;
+      box-shadow: none;
+      filter: saturate(0.72);
+    }
 
     .list {
       display: grid;
       gap: 10px;
+    }
+
+    .shelf-scroll {
+      max-height: 520px;
+      overflow-y: auto;
+      padding-right: 6px;
+      scrollbar-gutter: stable;
     }
 
     .card {
@@ -320,9 +333,10 @@
           <div class="panel-head">
             <div>
               <h2>Novel Shelf</h2>
-              <p class="panel-note">这里展示已经存在的小说。当前 MVP 里，小说会在你第一次给某个 `novel_id` 生成章节计划时自动出现。</p>
+              <p class="panel-note">这里展示已经存在的小说。你可以先创建一部空小说，再往里面补第一章；也可以直接在生成章节计划时自动创建。</p>
             </div>
             <div class="actions">
+              <button class="action" id="createNovelBtn" type="button">创建小说</button>
               <button class="action alt" id="refreshNovelsBtn" type="button">刷新小说列表</button>
             </div>
           </div>
@@ -337,7 +351,7 @@
             </label>
           </div>
           <div id="novelList" class="list">
-            <div class="empty">还没有小说记录。先生成一个章节计划，小说就会出现在这里。</div>
+            <div class="empty">还没有小说记录。你可以先创建一部空小说，或先生成一个章节计划。</div>
           </div>
         </section>
 
@@ -351,7 +365,7 @@
               <button class="action alt" id="refreshChaptersBtn" type="button">刷新章节列表</button>
             </div>
           </div>
-          <div id="chapterList" class="list">
+          <div id="chapterList" class="list shelf-scroll">
             <div class="empty">先选择一部小说，或先创建该小说的第一章。</div>
           </div>
         </section>
@@ -404,6 +418,7 @@
             </label>
           </div>
           <div class="actions">
+            <button class="action alt" id="nextChapterBtn" type="button">准备下一章</button>
             <button class="action" id="planBtn" type="button">1. Generate Plan</button>
             <button class="action alt" id="reviewTaskBtn" type="button">2. Fetch Review Task</button>
             <button class="action subtle hidden-dev" id="stateBtn" type="button">Inspect Raw State</button>
@@ -544,8 +559,10 @@
       statusPill: document.getElementById("statusPill"),
       userModeBtn: document.getElementById("userModeBtn"),
       devModeBtn: document.getElementById("devModeBtn"),
+      createNovelBtn: document.getElementById("createNovelBtn"),
       refreshNovelsBtn: document.getElementById("refreshNovelsBtn"),
       refreshChaptersBtn: document.getElementById("refreshChaptersBtn"),
+      nextChapterBtn: document.getElementById("nextChapterBtn"),
       planBtn: document.getElementById("planBtn"),
       reviewTaskBtn: document.getElementById("reviewTaskBtn"),
       stateBtn: document.getElementById("stateBtn"),
@@ -556,6 +573,7 @@
     let currentMode = "user";
     let selectedNovelId = "";
     let selectedChapterId = "";
+    let currentChapterList = [];
 
     function setMode(mode) {
       currentMode = mode;
@@ -580,6 +598,17 @@
       setJson(els.errorBox, "暂无错误。");
     }
 
+    function setTextBlock(node, value, emptyLabel) {
+      node.textContent = value || emptyLabel;
+      node.classList.toggle("empty", !value);
+    }
+
+    function syncDraftAvailability(status = els.reviewStatus.value) {
+      const canDraft = Boolean(els.chapterId.value.trim()) && String(status || "").trim() === "approved";
+      els.draftBtn.disabled = !canDraft;
+      els.draftBtn.title = canDraft ? "" : "Draft generation requires an approved review.";
+    }
+
     function renderEvidence(items) {
       if (!items || items.length === 0) {
         els.evidenceList.innerHTML = '<div class="empty">还没有召回证据。</div>';
@@ -598,10 +627,32 @@
       `).join("");
     }
 
+    function clearChapterWorkspace() {
+      selectedChapterId = "";
+      els.chapterId.value = "";
+      els.chapterNumber.value = 1;
+      els.chapterTitle.value = "";
+      els.chapterAgenda.value = "";
+      els.worldRules.value = "";
+      els.futureWaypoints.value = "";
+      els.guidanceFromFuture.value = "";
+      els.reviewStatus.value = "pending";
+      els.reviewDecision.value = "approved";
+      els.reviewNotes.value = "通过，进入初稿生成。";
+      els.approvedAgenda.value = "";
+      els.approvedRecallSummary.value = "";
+      renderEvidence([]);
+      setTextBlock(els.draftText, "", "还没有生成初稿。");
+      setTextBlock(els.criticText, "", "还没有 Critic 输出。");
+      setJson(els.stateLog, "暂无章节状态。");
+      syncDraftAvailability("pending");
+    }
+
     function applyNovelSelection(novel) {
       selectedNovelId = novel.novel_id || "";
       els.novelId.value = novel.novel_id || "";
       els.novelTitle.value = novel.novel_title || "";
+      clearChapterWorkspace();
       setStatus("novel-selected");
       loadChapters(selectedNovelId).catch(() => null);
     }
@@ -619,13 +670,14 @@
       if (chapter.novel_title) {
         els.novelTitle.value = chapter.novel_title;
       }
+      syncDraftAvailability(els.reviewStatus.value);
       setStatus("chapter-selected");
       fetchState().catch(() => null);
     }
 
     function renderNovels(novels) {
       if (!novels || novels.length === 0) {
-        els.novelList.innerHTML = '<div class="empty">还没有小说记录。先生成一个章节计划，小说就会出现在这里。</div>';
+        els.novelList.innerHTML = '<div class="empty">还没有小说记录。你可以先创建一部空小说，或先生成一个章节计划。</div>';
         return;
       }
 
@@ -655,6 +707,7 @@
     }
 
     function renderChapters(chapters) {
+      currentChapterList = Array.isArray(chapters) ? chapters : [];
       if (!chapters || chapters.length === 0) {
         els.chapterList.innerHTML = '<div class="empty">当前小说下还没有章节。先用下方表单生成一章计划。</div>';
         return;
@@ -709,6 +762,23 @@
       return data;
     }
 
+    function buildNextChapterId(baseChapterId, novelId, chapterNumber) {
+      const normalizedNovelId = novelId || "novel";
+      const fallback = `${normalizedNovelId}-chapter-${String(chapterNumber).padStart(3, "0")}`;
+      if (!baseChapterId) {
+        return fallback;
+      }
+
+      const matched = baseChapterId.match(/^(.*?)(\d+)$/);
+      if (!matched) {
+        return fallback;
+      }
+
+      const prefix = matched[1];
+      const width = matched[2].length;
+      return `${prefix}${String(chapterNumber).padStart(width, "0")}`;
+    }
+
     async function loadNovels() {
       const data = await apiRequest({ method: "GET", path: "/novels" });
       renderNovels(data.novels || []);
@@ -728,9 +798,11 @@
     function applyReviewTask(task) {
       els.reviewStatus.value = task.agenda_review_status || "pending";
       els.reviewDecision.value = task.agenda_review_status || "pending";
+      els.reviewNotes.value = task.agenda_review_notes || "";
       els.approvedAgenda.value = task.approved_chapter_agenda || "";
       els.approvedRecallSummary.value = task.approved_rag_recall_summary || "";
       renderEvidence(task.rag_evidence || []);
+      syncDraftAvailability(task.agenda_review_status || "pending");
       setStatus(task.agenda_review_status || "pending", task.audit_warning ? "warning" : "");
       setJson(els.responseLog, task);
       if (task.audit_warning) {
@@ -739,14 +811,42 @@
     }
 
     function applyDraft(data) {
-      els.draftText.textContent = data.draft || "还没有生成初稿。";
-      els.draftText.classList.toggle("empty", !data.draft);
-      els.criticText.textContent = data.critic_feedback || "还没有 Critic 输出。";
-      els.criticText.classList.toggle("empty", !data.critic_feedback);
+      els.reviewStatus.value = data.agenda_review_status || els.reviewStatus.value;
+      setTextBlock(els.draftText, data.draft, "还没有生成初稿。");
+      setTextBlock(els.criticText, data.critic_feedback, "还没有 Critic 输出。");
+      syncDraftAvailability(els.reviewStatus.value);
       setStatus(data.error ? "draft-error" : "draft-ready", data.error ? "danger" : "success");
       if (data.error) {
         setJson(els.errorBox, data.error);
       }
+    }
+
+    function applyChapterState(payload) {
+      const state = payload?.state;
+      if (!state) {
+        return;
+      }
+
+      selectedNovelId = state.novel_id || selectedNovelId;
+      selectedChapterId = state.chapter_id || selectedChapterId;
+      els.novelId.value = state.novel_id || els.novelId.value;
+      els.novelTitle.value = state.novel_title || els.novelTitle.value;
+      els.chapterId.value = state.chapter_id || els.chapterId.value;
+      els.chapterNumber.value = state.chapter_number ?? els.chapterNumber.value;
+      els.chapterTitle.value = state.chapter_title || els.chapterTitle.value;
+      els.chapterAgenda.value = state.chapter_agenda || "";
+      els.worldRules.value = state.world_rules || "";
+      els.futureWaypoints.value = state.future_waypoints || "";
+      els.guidanceFromFuture.value = state.guidance_from_future || "";
+      els.reviewStatus.value = state.agenda_review_status || "pending";
+      els.reviewDecision.value = state.agenda_review_status || "pending";
+      els.reviewNotes.value = state.agenda_review_notes || "";
+      els.approvedAgenda.value = state.approved_chapter_agenda || "";
+      els.approvedRecallSummary.value = state.approved_rag_recall_summary || "";
+      renderEvidence(state.rag_evidence || []);
+      setTextBlock(els.draftText, state.draft, "还没有生成初稿。");
+      setTextBlock(els.criticText, state.critic_feedback, "还没有 Critic 输出。");
+      syncDraftAvailability(state.agenda_review_status || "pending");
     }
 
     async function fetchState() {
@@ -756,11 +856,33 @@
       }
       const data = await apiRequest({ method: "GET", path: `/chapters/${encodeURIComponent(chapterId)}/state` });
       setJson(els.stateLog, data);
+      applyChapterState(data);
       return data;
     }
 
     els.userModeBtn.addEventListener("click", () => setMode("user"));
     els.devModeBtn.addEventListener("click", () => setMode("dev"));
+
+    els.createNovelBtn.addEventListener("click", async () => {
+      setStatus("creating-novel");
+      try {
+        const novel = await apiRequest({
+          method: "POST",
+          path: "/novels",
+          body: {
+            novel_id: els.novelId.value.trim(),
+            novel_title: els.novelTitle.value.trim(),
+          },
+        });
+        selectedNovelId = novel.novel_id || "";
+        clearChapterWorkspace();
+        await loadNovels().catch(() => null);
+        await loadChapters(selectedNovelId).catch(() => null);
+        setStatus("novel-created", "success");
+      } catch (_) {
+        setStatus("create-novel-error", "danger");
+      }
+    });
 
     els.refreshNovelsBtn.addEventListener("click", async () => {
       setStatus("loading-novels");
@@ -779,6 +901,56 @@
         setStatus("chapters-ready");
       } catch (_) {
         setStatus("chapters-error", "danger");
+      }
+    });
+
+    els.nextChapterBtn.addEventListener("click", async () => {
+      const novelId = els.novelId.value.trim();
+      if (!novelId) {
+        setJson(els.errorBox, {
+          error_code: "NOVEL_REQUIRED",
+          message: "Prepare Next Chapter requires a selected novel.",
+        });
+        setStatus("next-chapter-error", "danger");
+        return;
+      }
+
+      setStatus("preparing-next-chapter");
+      try {
+        let baseChapterId = "";
+        let baseChapterNumber = 0;
+
+        if (currentChapterList.length > 0) {
+          const latestChapter = currentChapterList[currentChapterList.length - 1];
+          applyChapterSelection(latestChapter);
+          const latestState = await fetchState().catch(() => null);
+          baseChapterId = String(latestState?.state?.chapter_id || latestChapter.chapter_id || "");
+          baseChapterNumber = Number(latestState?.state?.chapter_number || latestChapter.chapter_number || 0);
+        } else {
+          clearChapterWorkspace();
+        }
+
+        const nextChapterNumber = Math.max(baseChapterNumber + 1, 1);
+        const nextChapterId = buildNextChapterId(baseChapterId, novelId, nextChapterNumber);
+        selectedChapterId = nextChapterId;
+        els.chapterId.value = nextChapterId;
+        els.chapterNumber.value = nextChapterNumber;
+        els.chapterTitle.value = `第${nextChapterNumber}章`;
+        els.chapterAgenda.value = "";
+        els.reviewStatus.value = "pending";
+        els.reviewDecision.value = "approved";
+        els.reviewNotes.value = "通过，进入初稿生成。";
+        els.approvedAgenda.value = "";
+        els.approvedRecallSummary.value = "";
+        renderEvidence([]);
+        setTextBlock(els.draftText, "", "还没有生成初稿。");
+        setTextBlock(els.criticText, "", "还没有 Critic 输出。");
+        setJson(els.stateLog, "暂无章节状态。");
+        clearError();
+        syncDraftAvailability("pending");
+        setStatus("next-chapter-ready", "warning");
+      } catch (_) {
+        setStatus("next-chapter-error", "danger");
       }
     });
 
@@ -804,6 +976,7 @@
         selectedChapterId = data.chapter_id || selectedChapterId;
         els.reviewStatus.value = data.agenda_review_status || "pending";
         renderEvidence(data.rag_evidence || []);
+        syncDraftAvailability(data.agenda_review_status || "pending");
         setStatus("review-pending", "warning");
         await loadNovels().catch(() => null);
         await loadChapters(els.novelId.value.trim()).catch(() => null);
@@ -840,6 +1013,7 @@
           },
         });
         els.reviewStatus.value = data.agenda_review_status || "";
+        syncDraftAvailability(data.agenda_review_status || "");
         setStatus(data.agenda_review_status || "reviewed", data.agenda_review_status === "approved" ? "success" : "warning");
         await loadChapters(els.novelId.value.trim()).catch(() => null);
         await fetchState().catch(() => null);
@@ -874,6 +1048,7 @@
     setMode("user");
     setStatus("idle");
     clearError();
+    syncDraftAvailability();
     loadNovels().catch(() => null);
   </script>
 </body>
