@@ -248,6 +248,7 @@ class JsonlGraphStore(GraphStore):
             "chapter_number": _as_int(state.get("chapter_number")),
             "chapter_title": str(state.get("chapter_title", "")),
             "chapter_status": str(state.get("chapter_status", "")),
+            "chapter_agenda_draft": state.get("chapter_agenda_draft", ""),
             "chapter_agenda": state.get("chapter_agenda", ""),
             "rag_recall_summary": state.get("rag_recall_summary", ""),
             "rag_evidence": state.get("rag_evidence", []),

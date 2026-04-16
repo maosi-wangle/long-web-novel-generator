@@ -454,3 +454,10 @@
 - 最后看“页面怎么消费这些能力”
 
 这条路线最不容易迷路。
+
+## Agenda 命名更新（方案二）
+
+- `chapter_agenda_draft`：作者/前端输入的草稿细纲，作为 PlotPlanner 的输入。
+- `chapter_agenda`：PlotPlanner 产出的正式细纲，供 RAG recall、人工审核、后续放行使用。
+- Workbench 中输入框对应 `chapter_agenda_draft`，只读展示框对应 `chapter_agenda`。
+- `approved_chapter_agenda` 仍表示“人工审核后最终放行给 DraftWriter 的细纲”。

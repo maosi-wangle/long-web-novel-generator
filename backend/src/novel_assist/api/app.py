@@ -176,6 +176,8 @@ def create_plan(chapter_id: str, payload: PlanRequest) -> PlanResponse:
         chapter_number=state.get("chapter_number"),
         chapter_title=str(state.get("chapter_title", "")),
         chapter_status=str(state.get("chapter_status", "")),
+        use_mock_llm=bool(state.get("use_mock_llm", False)),
+        chapter_agenda_draft=str(state.get("chapter_agenda_draft", "")),
         chapter_agenda=str(state.get("chapter_agenda", "")),
         rag_recall_summary=str(state.get("rag_recall_summary", "")),
         rag_evidence=list(state.get("rag_evidence", [])),
@@ -183,6 +185,7 @@ def create_plan(chapter_id: str, payload: PlanRequest) -> PlanResponse:
         recall_trace_id=str(state.get("recall_trace_id", "")),
         audit_log_path=str(state.get("audit_log_path", "")),
         audit_warning=str(state.get("audit_warning", "")),
+        error=str(state.get("error", "")),
     )
 
 

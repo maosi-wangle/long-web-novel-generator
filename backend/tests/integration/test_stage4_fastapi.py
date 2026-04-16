@@ -57,12 +57,19 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         self.assertEqual(plan_data["agenda_review_status"], "pending")
         self.assertEqual(plan_data["novel_id"], "novel-api-001")
         self.assertEqual(plan_data["chapter_title"], "第一章")
+        self.assertEqual(
+            plan_data["error"],
+            "HumanReviewRequired: chapter agenda and recall evidence must be approved before drafting.",
+        )
         self.assertGreater(len(plan_data.get("rag_evidence", [])), 0)
+        self.assertIn("chapter_agenda_draft", plan_data)
+        self.assertIn("强化冲突", plan_data["chapter_agenda"])
 
         review_task_resp = self.client.get(f"/chapters/{chapter_id}/review-task")
         self.assertEqual(review_task_resp.status_code, 200)
         task_data = review_task_resp.json()
         self.assertEqual(task_data["chapter_id"], chapter_id)
+        self.assertIn("chapter_agenda_draft", task_data)
         self.assertEqual(task_data["novel_title"], "测试小说")
         self.assertTrue(task_data["recall_trace_id"].startswith("recall-"))
 
@@ -100,6 +107,51 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         self.assertEqual(state_data["chapter_id"], chapter_id)
         self.assertEqual(state_data["state"]["agenda_review_status"], "approved")
         self.assertEqual(state_data["state"]["novel_id"], "novel-api-001")
+
+    def test_plan_can_switch_use_mock_llm_from_request(self) -> None:
+        chapter_id = "chapter-api-real-0001"
+
+        plan_resp = self.client.post(
+            f"/chapters/{chapter_id}/plan",
+            json={
+                "novel_id": "novel-api-real",
+                "novel_title": "真实模型切换测试",
+                "chapter_number": 1,
+                "chapter_title": "第一章",
+                "use_mock_llm": False,
+            },
+        )
+        self.assertEqual(plan_resp.status_code, 200)
+
+        state_resp = self.client.get(f"/chapters/{chapter_id}/state")
+        self.assertEqual(state_resp.status_code, 200)
+        state_data = state_resp.json()["state"]
+        self.assertFalse(state_data["use_mock_llm"])
+
+    def test_plan_real_llm_failure_is_visible(self) -> None:
+        chapter_id = "chapter-api-real-fail-0001"
+        os.environ["LLM_API_KEY"] = ""
+        os.environ["LLM_BASE_URL"] = ""
+
+        plan_resp = self.client.post(
+            f"/chapters/{chapter_id}/plan",
+            json={
+                "novel_id": "novel-api-real-fail",
+                "novel_title": "真实模型失败可见性测试",
+                "chapter_number": 1,
+                "chapter_title": "第一章",
+                "use_mock_llm": False,
+            },
+        )
+        self.assertEqual(plan_resp.status_code, 200)
+        plan_data = plan_resp.json()
+        self.assertIn("LLM_API_KEY", plan_data["error"])
+        self.assertEqual(plan_data["rag_evidence"], [])
+
+        state_resp = self.client.get(f"/chapters/{chapter_id}/state")
+        self.assertEqual(state_resp.status_code, 200)
+        state_data = state_resp.json()["state"]
+        self.assertIn("LLM_API_KEY", state_data["error"])
 
     def test_multi_novel_and_chapter_management_routes(self) -> None:
         payloads = [
@@ -234,7 +286,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
             json={
                 "novel_id": "novel-seq",
                 "chapter_number": 2,
-                "chapter_agenda": "主角沿着第一章留下的线索追查到旧港口。",
+                "chapter_agenda_draft": "主角沿着第一章留下的线索追查到旧港口。",
             },
         )
         self.assertEqual(second_plan.status_code, 200)

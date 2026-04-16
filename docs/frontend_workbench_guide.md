@@ -206,3 +206,10 @@ python backend/src/novel_assist/cli/run_api.py
 6. 再补开发者模式里的原始状态和请求/响应日志
 7. 再把 `latest_recall_event` 和 `latest_review_event` 以更清晰的方式展示出来
 8. 工作流稳定后再优化样式与导航
+
+## Agenda 命名更新（方案二）
+
+- `chapter_agenda_draft`：作者/前端输入的草稿细纲，作为 PlotPlanner 的输入。
+- `chapter_agenda`：PlotPlanner 产出的正式细纲，供 RAG recall、人工审核、后续放行使用。
+- Workbench 中输入框对应 `chapter_agenda_draft`，只读展示框对应 `chapter_agenda`。
+- `approved_chapter_agenda` 仍表示“人工审核后最终放行给 DraftWriter 的细纲”。

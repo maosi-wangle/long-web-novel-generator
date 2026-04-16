@@ -86,6 +86,8 @@ class ChapterService:
 
     def generate_plan(self, *, chapter_id: str, overrides: dict[str, Any]) -> dict[str, Any]:
         state = build_initial_state()
+        if overrides.get("chapter_agenda_draft") is None and overrides.get("chapter_agenda") is not None:
+            overrides["chapter_agenda_draft"] = overrides.get("chapter_agenda")
         for key, value in overrides.items():
             if value is not None:
                 state[key] = value
@@ -104,6 +106,11 @@ class ChapterService:
         )
 
         state.update(plotting_node(state))
+        if str(state.get("error", "")).strip():
+            state["chapter_status"] = "planning"
+            self._store.save_chapter_state(chapter_id=chapter_id, state=state)
+            return state
+
         state.update(rag_recall_node(state))
         state["error"] = "HumanReviewRequired: chapter agenda and recall evidence must be approved before drafting."
 

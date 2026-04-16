@@ -62,7 +62,8 @@ class NovelState(TypedDict, total=False):
     current_phase: Phase  # 当前章节处于起承转合哪个阶段
     memory_l0: str  # 本章写作所需的近程上下文记忆
     previous_chapter_ending: str  # 上章结尾摘要/片段
-    chapter_agenda: str  # 本章细纲候选（审核前）
+    chapter_agenda_draft: str  # 作者/前端输入的本章细纲草案，供 PlotPlanner 读取
+    chapter_agenda: str  # PlotPlanner 产出的正式本章细纲，供后续 recall / review 使用
 
     # RAG 召回与人工审阅字段
     rag_recall_summary: str  # 本轮设定召回摘要

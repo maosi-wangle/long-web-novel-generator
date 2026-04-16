@@ -44,6 +44,7 @@ def build_initial_state() -> NovelState:
         "current_phase": "起",
         "memory_l0": "主角林澈，机械修理铺学徒，谨慎克制，擅长观察细节。",
         "previous_chapter_ending": "林澈在暴雨夜捡到一枚带有议会徽记的损坏数据芯片。",
+        "chapter_agenda_draft": chapter_agenda,
         "chapter_agenda": chapter_agenda,
         "world_rules": "境界顺序不可跳跃；筑基期不能瞬移；跨城传送需借助阵法与高额代价。",
         "future_waypoints": "第50章主角必须坠崖失忆；第100章主角与终极反派在天渊城决战。",
