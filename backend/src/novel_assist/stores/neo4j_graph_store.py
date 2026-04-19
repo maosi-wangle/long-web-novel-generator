@@ -135,3 +135,78 @@ class Neo4jGraphStore(GraphStore):
 
     def list_chapters(self, *, novel_id: str) -> list[dict[str, Any]]:
         return self._fallback.list_chapters(novel_id=novel_id)
+
+    def persist_memory_items(
+        self,
+        *,
+        novel_id: str,
+        chapter_id: str,
+        memory_items: list[dict[str, Any]],
+    ) -> tuple[str, str]:
+        trace_id, path = self._fallback.persist_memory_items(
+            novel_id=novel_id,
+            chapter_id=chapter_id,
+            memory_items=memory_items,
+        )
+        for item in memory_items:
+            memory_id = str(item.get("memory_id", ""))
+            if not memory_id:
+                continue
+            self._write_to_neo4j(
+                """
+                MERGE (c:Chapter {chapter_id: $chapter_id})
+                MERGE (m:MemoryItem {memory_id: $memory_id})
+                SET m.novel_id = $novel_id,
+                    m.memory_type = $memory_type,
+                    m.title = $title,
+                    m.content = $content,
+                    m.tags = $tags,
+                    m.salience = $salience
+                MERGE (c)-[:HARVESTED]->(m)
+                """,
+                {
+                    "chapter_id": chapter_id,
+                    "memory_id": memory_id,
+                    "novel_id": novel_id,
+                    "memory_type": str(item.get("memory_type", "")),
+                    "title": str(item.get("title", "")),
+                    "content": str(item.get("content", "")),
+                    "tags": list(item.get("tags", [])),
+                    "salience": float(item.get("salience", 0.0) or 0.0),
+                },
+            )
+        return trace_id, path
+
+    def list_memory_items(
+        self,
+        *,
+        novel_id: str,
+        chapter_id: str | None = None,
+        memory_types: list[str] | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        return self._fallback.list_memory_items(
+            novel_id=novel_id,
+            chapter_id=chapter_id,
+            memory_types=memory_types,
+            limit=limit,
+        )
+
+    def retrieve_memory_candidates(
+        self,
+        *,
+        novel_id: str,
+        query_text: str,
+        chapter_id: str = "",
+        entity_ids: list[str] | None = None,
+        tags: list[str] | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        return self._fallback.retrieve_memory_candidates(
+            novel_id=novel_id,
+            query_text=query_text,
+            chapter_id=chapter_id,
+            entity_ids=entity_ids,
+            tags=tags,
+            limit=limit,
+        )

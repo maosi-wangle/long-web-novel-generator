@@ -15,7 +15,6 @@ API startup flow (local development):
 3. Verify service:
    - GET /
    - GET /healthz
-   - GET /workbench
    - GET /novels
 
 4. HITL API call order:
@@ -25,12 +24,10 @@ API startup flow (local development):
    - POST /chapters/{chapter_id}/draft
 """
 
-from pathlib import Path
-
 from fastapi.encoders import jsonable_encoder
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 
 from novel_assist.api.chapter_service import ChapterService
 from novel_assist.api.schemas import (
@@ -49,7 +46,6 @@ from novel_assist.api.schemas import (
 )
 
 app = FastAPI(title="Novel Assist HITL API", version="0.1.0")
-WORKBENCH_PATH = Path(__file__).with_name("workbench.html")
 
 
 class ApiErrorException(Exception):
@@ -112,7 +108,6 @@ def root() -> dict[str, object]:
         "version": "0.1.0",
         "docs": "/docs",
         "health": "/healthz",
-        "workbench": "/workbench",
         "endpoints": [
             "GET /novels",
             "POST /novels",
@@ -129,11 +124,6 @@ def root() -> dict[str, object]:
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
-
-
-@app.get("/workbench", response_class=HTMLResponse)
-def workbench() -> HTMLResponse:
-    return HTMLResponse(WORKBENCH_PATH.read_text(encoding="utf-8"))
 
 
 @app.get("/novels", response_model=NovelListResponse)

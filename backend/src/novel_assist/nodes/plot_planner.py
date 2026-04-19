@@ -22,14 +22,14 @@ SYSTEM_PROMPT = """你是小说策划智能体。
 2. 只输出一段细纲文本，不要解释，不要分点，不要加标题。
 3. 如果输入里已有作者草案，要在尊重原意的基础上润色和补足冲突张力。
 4. 如果有人工驳回意见，必须吸收这些意见后再生成新的细纲。
-5. 细纲只需要大致框架即可，不要写得过于细节"""
+5. 细纲只需要大致框架即可，不要写得过于细节 """
 
 
 def _as_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if value is None:
-        return False
+        return False    
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 

@@ -21,6 +21,7 @@ class Stage3AuditTrailIntegrationTests(unittest.TestCase):
         self._tmp_dir = tempfile.TemporaryDirectory()
         self.audit_path = Path(self._tmp_dir.name) / "review_audit.jsonl"
         os.environ["REVIEW_AUDIT_PATH"] = str(self.audit_path)
+        os.environ["MEMORY_STATE_PATH"] = str(Path(self._tmp_dir.name) / "memory_state.json")
 
     def tearDown(self) -> None:
         os.environ.clear()

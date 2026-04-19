@@ -1,4 +1,6 @@
 # Stage 4 代码阅读清单
+> Note: the standalone frontend/workbench is currently paused. The active runtime path is backend-only FastAPI + service + store + node flow.
+
 
 这份清单不是功能宣传，而是给你按“调用链 + 分层职责”去读代码用的。
 

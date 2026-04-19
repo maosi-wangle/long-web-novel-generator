@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -16,10 +17,13 @@ from novel_assist.graph.workflow import build_workflow_app  # noqa: E402
 class Stage2WorkflowTests(unittest.TestCase):
     def setUp(self) -> None:
         self._old_env = dict(os.environ)
+        self._tmp_dir = tempfile.TemporaryDirectory()
+        os.environ["MEMORY_STATE_PATH"] = str(Path(self._tmp_dir.name) / "memory_state.json")
 
     def tearDown(self) -> None:
         os.environ.clear()
         os.environ.update(self._old_env)
+        self._tmp_dir.cleanup()
 
     def _invoke(self) -> dict:
         app = build_workflow_app()

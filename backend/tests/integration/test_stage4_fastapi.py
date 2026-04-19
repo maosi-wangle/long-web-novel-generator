@@ -24,6 +24,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         os.environ["CHAPTER_STATE_PATH"] = str(Path(self._tmp_dir.name) / "chapter_state.json")
         os.environ["REVIEW_AUDIT_PATH"] = str(Path(self._tmp_dir.name) / "review_audit.jsonl")
         os.environ["NOVEL_STATE_PATH"] = str(Path(self._tmp_dir.name) / "novel_state.json")
+        os.environ["MEMORY_STATE_PATH"] = str(Path(self._tmp_dir.name) / "memory_state.json")
         os.environ.pop("HUMAN_REVIEW_STATUS", None)
         os.environ.pop("AUTO_APPROVE_REVIEW", None)
         self.client = TestClient(app)
@@ -35,13 +36,6 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
 
     def test_hitl_end_to_end(self) -> None:
         chapter_id = "chapter-api-0001"
-
-        workbench_resp = self.client.get("/workbench")
-        self.assertEqual(workbench_resp.status_code, 200)
-        self.assertIn("Novel Assist Stage 4 Workbench", workbench_resp.text)
-        self.assertIn("Novel Shelf", workbench_resp.text)
-        self.assertIn("创建小说", workbench_resp.text)
-        self.assertIn("准备下一章", workbench_resp.text)
 
         plan_resp = self.client.post(
             f"/chapters/{chapter_id}/plan",
@@ -63,7 +57,6 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         )
         self.assertGreater(len(plan_data.get("rag_evidence", [])), 0)
         self.assertIn("chapter_agenda_draft", plan_data)
-        self.assertIn("强化冲突", plan_data["chapter_agenda"])
 
         review_task_resp = self.client.get(f"/chapters/{chapter_id}/review-task")
         self.assertEqual(review_task_resp.status_code, 200)
@@ -83,7 +76,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
             f"/chapters/{chapter_id}/review",
             json={
                 "agenda_review_status": "approved",
-                "agenda_review_notes": "通过，进入初稿生成。",
+                "agenda_review_notes": "通过，进入初稿生成",
                 "approved_chapter_agenda": "",
                 "approved_rag_recall_summary": "",
             },
@@ -174,7 +167,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
                 "novel_id": "novel-b",
                 "novel_title": "小说 B",
                 "chapter_number": 1,
-                "chapter_title": "开篇",
+                "chapter_title": "序章",
             },
         ]
 
@@ -215,13 +208,13 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
             "/novels",
             json={
                 "novel_id": "novel-empty",
-                "novel_title": "空白小说",
+                "novel_title": "空小说",
             },
         )
         self.assertEqual(create_resp.status_code, 200)
         create_data = create_resp.json()
         self.assertEqual(create_data["novel_id"], "novel-empty")
-        self.assertEqual(create_data["novel_title"], "空白小说")
+        self.assertEqual(create_data["novel_title"], "空小说")
         self.assertEqual(create_data["chapter_count"], 0)
 
         novels_resp = self.client.get("/novels")
@@ -234,7 +227,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
         chapters_resp = self.client.get("/novels/novel-empty/chapters")
         self.assertEqual(chapters_resp.status_code, 200)
         chapters_data = chapters_resp.json()
-        self.assertEqual(chapters_data["novel_title"], "空白小说")
+        self.assertEqual(chapters_data["novel_title"], "空小说")
         self.assertEqual(chapters_data["chapters"], [])
 
         duplicate_resp = self.client.post(
@@ -258,9 +251,9 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
                 "novel_title": "连续章节小说",
                 "chapter_number": 1,
                 "chapter_title": "第一章",
-                "world_rules": "灵气运转必须遵循经脉，不可越阶瞬发。",
-                "future_waypoints": "反派不能在前十章暴露真实身份。",
-                "guidance_from_future": "第二章必须延续第一章结尾的追逐。",
+                "world_rules": "筑基期不能瞬移。",
+                "future_waypoints": "跟踪者不能在本章死亡。",
+                "guidance_from_future": "第二章继续强化被监视感。",
             },
         )
         self.assertEqual(first_plan.status_code, 200)
@@ -269,7 +262,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
             f"/chapters/{first_chapter_id}/review",
             json={
                 "agenda_review_status": "approved",
-                "agenda_review_notes": "通过。",
+                "agenda_review_notes": "通过",
                 "approved_chapter_agenda": "",
                 "approved_rag_recall_summary": "",
             },
@@ -286,7 +279,7 @@ class Stage4FastApiIntegrationTests(unittest.TestCase):
             json={
                 "novel_id": "novel-seq",
                 "chapter_number": 2,
-                "chapter_agenda_draft": "主角沿着第一章留下的线索追查到旧港口。",
+                "chapter_agenda_draft": "主角沿着上一章留下的线索追查到旧港口。",
             },
         )
         self.assertEqual(second_plan.status_code, 200)

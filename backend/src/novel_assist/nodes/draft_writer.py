@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
-from dotenv import load_dotenv
-from openai import OpenAI
+import os
 
+from novel_assist.llm.client import generate_text
 from novel_assist.state.novel_state import NovelState, WriterViewState
 
 DEFAULT_MODEL_NAME = "qwen3-max-preview"
 DEFAULT_TEMPERATURE = 0.9
-DEFAULT_TIMEOUT_SECONDS = 90.0
-DEFAULT_MAX_RETRIES = 2
-
 SYSTEM_PROMPT = """你是小说写作执行助手。
 你只能依据“已人工审核通过”的章节信息写作，不得擅自扩展世界规则或未来剧情。
 
@@ -73,56 +69,6 @@ def _mock_draft_response(state: WriterViewState) -> str:
     )
 
 
-def call_llm(
-    *,
-    state: WriterViewState,
-    prompt: str,
-    model_name: str,
-    temperature: float,
-    use_mock_llm: bool,
-) -> str:
-    if use_mock_llm:
-        return _mock_draft_response(state)
-
-    load_dotenv()
-    api_key = os.getenv("LLM_API_KEY")
-    base_url = os.getenv("LLM_BASE_URL")
-
-    if not api_key:
-        raise RuntimeError("LLM_API_KEY 未配置。")
-    if not base_url:
-        raise RuntimeError("LLM_BASE_URL 未配置。")
-
-    timeout_seconds = float(os.getenv("LLM_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS)))
-    max_retries = int(os.getenv("LLM_MAX_RETRIES", str(DEFAULT_MAX_RETRIES)))
-    client = OpenAI(api_key=api_key, base_url=base_url, max_retries=max_retries)
-
-    last_error: Exception | None = None
-    for _ in range(max_retries + 1):
-        try:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=temperature,
-                max_tokens=3000,
-                timeout=timeout_seconds,
-            )
-            content = response.choices[0].message.content
-            if not content:
-                raise RuntimeError("模型返回空内容。")
-            return content
-        except Exception as exc:
-            last_error = exc
-            error_name = type(exc).__name__
-            if error_name not in {"APITimeoutError", "APIConnectionError"}:
-                raise
-
-    raise RuntimeError(f"调用模型失败，重试后仍超时或连接失败：{last_error}")
-
-
 def draft_writer_node(state: NovelState) -> dict[str, Any]:
     """Generate draft only when agenda has passed human review."""
     next_state: dict[str, Any] = dict(state)
@@ -170,12 +116,15 @@ def draft_writer_node(state: NovelState) -> dict[str, Any]:
     temperature = float(state.get("temperature", DEFAULT_TEMPERATURE))
 
     try:
-        draft_text = call_llm(
-            state=writer_view,
-            prompt=prompt,
+        draft_text = generate_text(
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=prompt,
             model_name=model_name,
             temperature=temperature,
+            max_tokens=3000,
             use_mock_llm=use_mock_llm,
+            mock_response_factory=lambda: _mock_draft_response(writer_view),
+            strip_output=False,
         )
         next_state.update(
             {
