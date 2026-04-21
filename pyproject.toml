@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "generate-novel3"
+version = "0.1.0"
+description = "Multi-agent Chinese novel generator with outline planning, drafting, and RAG memory."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "faiss-cpu>=1.11.0",
+  "orjson>=3.10.18",
+  "pydantic>=2.11.0",
+  "rank-bm25>=0.2.2",
+  "sentence-transformers>=4.1.0",
+  "typer>=0.16.0",
+]
+
+[project.scripts]
+generate-novel = "src.app:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/README.md",
+  "/design.md",
+  "/pyproject.toml",
+  "/src",
+]
