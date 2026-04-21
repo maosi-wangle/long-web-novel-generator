@@ -42,6 +42,7 @@ class ProjectState(BaseModel):
     detail_outline_version: int = 0
     last_completed_chapter: int = 0
     pending_human_review: bool = False
+    pending_review_id: str | None = None
     active_chapter_title: str | None = None
     notes: list[str] = Field(default_factory=list)
     last_error: str | None = None
@@ -71,4 +72,3 @@ class ProjectState(BaseModel):
         self.status = WorkflowStatus.outline_ready
         self.current_stage = GenerationStage.detail_outline
         return self.touch()
-

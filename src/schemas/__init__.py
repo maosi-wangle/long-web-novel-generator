@@ -9,6 +9,7 @@ from .outline import (
     StoryDirectionCandidate,
 )
 from .project import ProjectBootstrapRequest, ProjectRecord
+from .review import HumanReviewRecord, ReviewDecision, ReviewStatus
 from .scene import RetrievedContextSnippet, SceneProgress
 from .tool_io import (
     HumanInterventionRequest,
@@ -28,6 +29,7 @@ __all__ = [
     "ForeshadowingItem",
     "HumanInterventionRequest",
     "HumanInterventionResult",
+    "HumanReviewRecord",
     "InternalReasoningPackage",
     "NovelOutline",
     "ProjectBootstrapRequest",
@@ -37,6 +39,8 @@ __all__ = [
     "RagSearchRequest",
     "RagSearchResult",
     "RetrievedContextSnippet",
+    "ReviewDecision",
+    "ReviewStatus",
     "SceneProgress",
     "StoryDirectionCandidate",
     "WriterPacket",

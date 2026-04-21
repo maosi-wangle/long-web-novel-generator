@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 
 from src.config import DATA_ROOT, get_project_paths
 from src.schemas.chapter import ChapterArtifact
@@ -9,6 +10,10 @@ from src.schemas.chapter import ChapterArtifact
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+SECTION_RE = re.compile(r"^##\s+(?P<title>.+?)\s*$", re.MULTILINE)
+TITLE_RE = re.compile(r"^#\s+第\s+(?P<chapter_id>\d+)\s+章\s+(?P<title>.+?)\s*$", re.MULTILINE)
 
 
 class MarkdownStore:
@@ -40,6 +45,26 @@ class MarkdownStore:
         if not file_path.exists():
             return None
         return file_path.read_text(encoding="utf-8")
+
+    def load_chapter_artifact(self, project_id: str, chapter_id: int) -> ChapterArtifact:
+        raw = self.load_chapter_text(project_id, chapter_id)
+        if raw is None:
+            raise FileNotFoundError(f"Chapter markdown not found for chapter {chapter_id}.")
+
+        title_match = TITLE_RE.search(raw)
+        if title_match is None:
+            raise RuntimeError(f"Chapter markdown {chapter_id} does not contain a valid title line.")
+
+        sections = self._parse_sections(raw)
+        return ChapterArtifact(
+            chapter_id=int(title_match.group("chapter_id")),
+            title=title_match.group("title").strip(),
+            markdown_body=sections.get("正文", "").strip(),
+            summary=sections.get("章节摘要", "").strip(),
+            new_facts=self._parse_list_section(sections.get("新增事实", "")),
+            foreshadow_candidates=self._parse_list_section(sections.get("伏笔候选", "")),
+            referenced_chunks=self._parse_list_section(sections.get("引用记忆片段", "")),
+        )
 
     def load_recent_chapter_context(
         self,
@@ -92,3 +117,26 @@ class MarkdownStore:
         if not items:
             return "- 无"
         return "\n".join(f"- {item}" for item in items)
+
+    @staticmethod
+    def _parse_sections(markdown: str) -> dict[str, str]:
+        matches = list(SECTION_RE.finditer(markdown))
+        sections: dict[str, str] = {}
+        for index, match in enumerate(matches):
+            title = match.group("title").strip()
+            start = match.end()
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
+            sections[title] = markdown[start:end].strip()
+        return sections
+
+    @staticmethod
+    def _parse_list_section(content: str) -> list[str]:
+        items: list[str] = []
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("- "):
+                continue
+            value = stripped[2:].strip()
+            if value and value != "无":
+                items.append(value)
+        return items

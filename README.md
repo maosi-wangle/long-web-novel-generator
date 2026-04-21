@@ -13,6 +13,7 @@
 - Writer Agent 的章节正文生成与 Markdown 归档
 - 写后自动 chunking / embedding / FAISS / BM25 入库
 - RAG 检索工具与 CLI
+- Human review tool，可挂起/恢复总纲、细纲、正文流程
 - 章节 Markdown 归档
 - 后续接入 Agent / RAG 的编排入口
 
@@ -42,6 +43,9 @@ generate-novel write-chapter demo_project
 generate-novel show-chapter demo_project --chapter-id 1
 generate-novel ingest-chapter demo_project --chapter-id 1
 generate-novel rag-search demo_project "莫长老"
+generate-novel write-chapter demo_project --chapter-id 1 --require-review
+generate-novel list-reviews demo_project --status pending
+generate-novel resolve-review demo_project --review-id review_0001 --decision approve
 ```
 
 也可以直接运行：
@@ -55,6 +59,11 @@ python -m src.app init-project demo_project --title "示例小说"
 本次已接入总纲阶段，尚未接入：
 
 - 人工介入 tool 的交互式后端
+
+注意：
+
+- 当前 human tool 已支持本地 review 文件、待处理队列和 CLI 解决流程
+- 还没有接 Web UI 或消息通知
 
 ## RAG 默认配置
 

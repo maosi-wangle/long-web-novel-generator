@@ -12,13 +12,14 @@
 4. 正文生成 `WriterAgent`
 5. 章节 Markdown 归档
 6. 写后自动 RAG 入库
-7. 项目状态推进
+7. Human review 挂起 / 恢复
+8. 项目状态推进
 
 尚未完成：
 
-1. `request_human_intervention` tool 的实际调用后端
-2. 更细粒度的 agent tool 权限控制
-3. 自动循环 runner
+1. 更细粒度的 agent tool 权限控制
+2. 自动循环 runner
+3. Web UI / 通知式人工审核入口
 
 ## 2. 当前主流程
 
@@ -122,6 +123,11 @@
   - 统一重建项目索引
 - `src/tools/rag_tool.py`
   - 对外暴露 ingest / search 工具接口
+- `src/tools/human_tool.py`
+  - review 创建
+  - review 列表 / 查询
+  - review 解决
+  - 审核通过后将结果应用回项目
 
 ## 4. 项目目录约定
 
@@ -136,6 +142,10 @@ data/projects/{project_id}/
     0001.md
   detail_outlines/
     0001.json
+  reviews/
+    index.json
+    review_0001_chapter_review.json
+    review_0001_chapter_review.md
   rag/
     faiss/
     bm25/
@@ -224,6 +234,16 @@ data/projects/{project_id}/
 - `python -m src.app ingest-chapter <project_id> --chapter-id N`
 - `python -m src.app rebuild-rag <project_id>`
 - `python -m src.app rag-search <project_id> "<query>"`
+
+### 6.6 Human Review
+
+- `python -m src.app generate-outline <project_id> --require-review`
+- `python -m src.app generate-detail-outline <project_id> --require-review`
+- `python -m src.app write-chapter <project_id> --require-review`
+- `python -m src.app request-review <project_id> --stage ... --reason "..."`
+- `python -m src.app list-reviews <project_id> [--status pending|resolved]`
+- `python -m src.app show-review <project_id> --review-id review_0001`
+- `python -m src.app resolve-review <project_id> --review-id review_0001 --decision approve|reject`
 
 默认章节选择规则：
 
@@ -367,6 +387,48 @@ RAG 接入规则：
 - 为了支持重写同一章后的索引覆盖，当前 ingest 采用“全量重建”策略，而不是增量 append。
 - 当前 `entity_filter` 基于 chunk 内抽取出的简单词项，不是专门 NER。
 
+### 7.5 HumanTool
+
+定义位置：
+
+- `src/tools/human_tool.py`
+
+当前实现逻辑：
+
+1. `request_review()`
+   - 创建 review record
+   - 写 review payload 文件
+   - 如有正文预览则写 `.md` 预览文件
+   - 把项目状态切到 `waiting_human_review`
+2. `list_reviews()` / `get_review()`
+3. `resolve_review()`
+   - `approve`
+     - `outline_review`：必要时保存编辑后的 outline
+     - `detail_outline_review`：必要时保存编辑后的 detail outline
+     - `chapter_review`：将待审稿正式 archive 并自动 ingest
+   - `reject`
+     - 回退到对应生成阶段
+
+当前 review 存储：
+
+- `data/projects/{project_id}/reviews/index.json`
+- `data/projects/{project_id}/reviews/review_XXXX_*.json`
+- 对 chapter review 还会有：
+  - `review_XXXX_chapter_review.md`
+
+当前 review 状态机：
+
+- 请求 review 后：
+  - `status = waiting_human_review`
+  - `pending_human_review = true`
+  - `pending_review_id = review_xxxx`
+- approve 后：
+  - 清除 pending review
+  - 恢复主流程
+- reject 后：
+  - 清除 pending review
+  - 回退到对应生成阶段，等待重新生成
+
 ## 8. 核心 Schema 约定
 
 ### 8.1 NovelOutline
@@ -480,6 +542,9 @@ SPARSE_WEIGHT=0.35
 - `data/projects/outline_demo/rag/meta.jsonl`
 - `data/projects/outline_demo/rag/faiss/index.faiss`
 - `data/projects/outline_demo/rag/bm25/documents.json`
+- `data/projects/outline_demo/reviews/index.json`
+- `data/projects/outline_demo/reviews/review_0001_chapter_review.json`
+- `data/projects/outline_demo/reviews/review_0001_chapter_review.md`
 
 说明：
 
@@ -489,6 +554,7 @@ SPARSE_WEIGHT=0.35
   - 第 1 章正文生成与归档
   - 第 1 章 RAG 入库
   - `rag-search` 检索验证
+  - 第 3 章 `chapter_review` 挂起 / approve / 恢复流程验证
 
 当前 `outline_demo` 的状态大意：
 
@@ -545,14 +611,30 @@ SPARSE_WEIGHT=0.35
 - 后续是否要做成更显式的 tool-call 日志
 - 是否要把检索 query 和命中结果持久化成调试记录
 
+### 11.6 Human review 已经可用，但仍是本地 CLI 形态
+
+当前 human tool 已经支持：
+
+- review 文件落盘
+- pending review 队列
+- 审核通过 / 驳回
+- 驳回后流程回退
+
+当前还没做：
+
+- Web 页面审阅
+- 多用户协作审阅
+- 审阅通知
+- 结构化 diff 展示
+
 ## 12. 下一步开发建议
 
 最推荐的下一步是继续把 tool 层补完整：
 
-1. 补 `tools/human_tool.py`
-2. 做 agent tool 权限控制
-3. 记录每次检索 query / hits 作为调试日志
-4. 让 Detail / Writer 在必要时做多轮检索，而不是固定一次
+1. 做 agent tool 权限控制
+2. 记录每次检索 query / hits 作为调试日志
+3. 让 Detail / Writer 在必要时做多轮检索，而不是固定一次
+4. 给 human review 加结构化 diff / edited file 辅助工具
 
 之后再接：
 

@@ -19,6 +19,8 @@ class ProjectPaths:
     progress_file: Path
     chapters_dir: Path
     detail_outlines_dir: Path
+    reviews_dir: Path
+    reviews_index_file: Path
     rag_dir: Path
     faiss_dir: Path
     bm25_dir: Path
@@ -28,6 +30,7 @@ class ProjectPaths:
         self.project_root.mkdir(parents=True, exist_ok=True)
         self.chapters_dir.mkdir(parents=True, exist_ok=True)
         self.detail_outlines_dir.mkdir(parents=True, exist_ok=True)
+        self.reviews_dir.mkdir(parents=True, exist_ok=True)
         self.faiss_dir.mkdir(parents=True, exist_ok=True)
         self.bm25_dir.mkdir(parents=True, exist_ok=True)
 
@@ -106,6 +109,8 @@ def get_project_paths(project_id: str) -> ProjectPaths:
         progress_file=project_root / "progress.json",
         chapters_dir=project_root / "chapters",
         detail_outlines_dir=project_root / "detail_outlines",
+        reviews_dir=project_root / "reviews",
+        reviews_index_file=project_root / "reviews" / "index.json",
         rag_dir=rag_dir,
         faiss_dir=rag_dir / "faiss",
         bm25_dir=rag_dir / "bm25",

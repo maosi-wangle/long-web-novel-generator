@@ -40,6 +40,8 @@ class NovelWorkflow:
     def save_outline(self, project_id: str, outline: NovelOutline) -> ProjectState:
         state = self.state_store.load_state(project_id)
         state.outline_version += 1
+        state.pending_human_review = False
+        state.pending_review_id = None
         state.mark_status(WorkflowStatus.outline_ready, stage=GenerationStage.detail_outline)
         self.state_store.save_outline(project_id, outline)
         self.state_store.save_state(project_id, state)
@@ -52,6 +54,8 @@ class NovelWorkflow:
         state.detail_outline_version += 1
         state.current_act_index = act_index
         state.current_chapter_index = detail_outline.chapter_id
+        state.pending_human_review = False
+        state.pending_review_id = None
         state.active_chapter_title = detail_outline.title
         state.mark_status(WorkflowStatus.detail_outline_ready, stage=GenerationStage.writer)
         self.state_store.save_detail_outline(project_id, detail_outline)
@@ -70,10 +74,40 @@ class NovelWorkflow:
         state.current_act_index = self._find_act_index_for_chapter(outline, chapter.chapter_id)
         state.current_chapter_index = chapter.chapter_id
         state.last_completed_chapter = chapter.chapter_id
+        state.pending_human_review = False
+        state.pending_review_id = None
         if self._is_last_chapter(outline, chapter.chapter_id):
             state.mark_status(WorkflowStatus.completed, stage=GenerationStage.archive)
         else:
             state.mark_status(WorkflowStatus.outline_ready, stage=GenerationStage.detail_outline)
+        self.state_store.save_state(project_id, state)
+        return state
+
+    def mark_waiting_human_review(self, project_id: str, review_id: str) -> ProjectState:
+        state = self.state_store.load_state(project_id)
+        state.pending_human_review = True
+        state.pending_review_id = review_id
+        state.mark_status(WorkflowStatus.waiting_human_review)
+        self.state_store.save_state(project_id, state)
+        return state
+
+    def clear_waiting_human_review(
+        self,
+        project_id: str,
+        *,
+        status: WorkflowStatus | None = None,
+        stage: GenerationStage | None = None,
+        note: str | None = None,
+    ) -> ProjectState:
+        state = self.state_store.load_state(project_id)
+        state.pending_human_review = False
+        state.pending_review_id = None
+        if note:
+            state.notes.append(note)
+        if status is not None or stage is not None:
+            state.mark_status(status or state.status, stage=stage)
+        else:
+            state.touch()
         self.state_store.save_state(project_id, state)
         return state
 
