@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.schemas.outline import StoryDirectionCandidate
+from src.schemas.outline import ChapterBlueprint, StoryDirectionCandidate
 
 
 class StoryDirectionBatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     candidates: list[StoryDirectionCandidate] = Field(default_factory=list)
+
+
+class ChapterBlueprintBatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    chapters: list[ChapterBlueprint] = Field(default_factory=list)
 
 
 class DetailOutlineAnalysis(BaseModel):

@@ -39,9 +39,9 @@ class ProjectPaths:
 class LLMSettings:
     api_key: str
     base_url: str
-    outline_model: str = "qwen3.5-flash"
-    detail_outline_model: str = "qwen3.5-flash"
-    writer_model: str = "qwen3.5-flash"
+    outline_model: str = "qwen3.6-plus"
+    detail_outline_model: str = "qwen3.6-plus"
+    writer_model: str = "qwen3.6-plus"
 
 
 @dataclass(frozen=True)
@@ -78,9 +78,9 @@ def get_llm_settings() -> LLMSettings:
     return LLMSettings(
         api_key=api_key,
         base_url=base_url,
-        outline_model=os.getenv("OUTLINE_MODEL", "qwen3.5-flash").strip() or "qwen3.5-flash",
-        detail_outline_model=os.getenv("DETAIL_OUTLINE_MODEL", "qwen3.5-flash").strip() or "qwen3.5-flash",
-        writer_model=os.getenv("WRITER_MODEL", "qwen3.5-flash").strip() or "qwen3.5-flash",
+        outline_model=os.getenv("OUTLINE_MODEL", "qwen3.6-plus").strip() or "qwen3.6-plus",
+        detail_outline_model=os.getenv("DETAIL_OUTLINE_MODEL", "qwen3.6-plus").strip() or "qwen3.6-plus",
+        writer_model=os.getenv("WRITER_MODEL", "qwen3.6-plus").strip() or "qwen3.6-plus",
     )
 
 

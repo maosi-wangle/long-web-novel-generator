@@ -1,4 +1,4 @@
-from .agent_outputs import DetailOutlineAnalysis, StoryDirectionBatch
+from .agent_outputs import ChapterBlueprintBatch, DetailOutlineAnalysis, StoryDirectionBatch
 from .chapter import (
     ChapterArtifact,
     ChapterRollup,
@@ -37,12 +37,15 @@ from .memory import (
 )
 from .outline import (
     ActOutline,
+    ChapterBlueprint,
     ChapterPlan,
     CharacterProfile,
     ForeshadowingItem,
     NovelOutline,
     ScenePlan,
+    StoryStructure,
     StoryDirectionCandidate,
+    TurningPoint,
 )
 from .project import ProjectBootstrapRequest, ProjectRecord
 from .review import HumanReviewRecord, ReviewDecision, ReviewStatus
@@ -61,6 +64,8 @@ __all__ = [
     "BudgetBucketReport",
     "BudgetStatus",
     "ChapterArtifact",
+    "ChapterBlueprint",
+    "ChapterBlueprintBatch",
     "ChapterRollup",
     "ChapterMemory",
     "ChapterPlan",
@@ -101,8 +106,10 @@ __all__ = [
     "StickyConstraintState",
     "StoryDirectionBatch",
     "StoryDirectionCandidate",
+    "StoryStructure",
     "TimelineEntry",
     "TimelineState",
+    "TurningPoint",
     "WorldState",
     "WriterContext",
     "WriterPacket",

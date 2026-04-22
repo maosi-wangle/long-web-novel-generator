@@ -88,5 +88,7 @@ SPARSE_WEIGHT=0.35
 ```env
 DASHSCOPE_API_KEY=your_key
 DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-OUTLINE_MODEL=qwen3.5-flash
+OUTLINE_MODEL=qwen3.6-plus
+DETAIL_OUTLINE_MODEL=qwen3.6-plus
+WRITER_MODEL=qwen3.6-plus
 ```
