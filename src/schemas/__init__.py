@@ -1,5 +1,13 @@
 from .agent_outputs import DetailOutlineAnalysis, StoryDirectionBatch
-from .chapter import ChapterArtifact, DetailOutline, InternalReasoningPackage, WriterPacket
+from .chapter import (
+    ChapterArtifact,
+    ChapterRollup,
+    DetailOutline,
+    InternalReasoningPackage,
+    SceneBrief,
+    SceneDraft,
+    WriterPacket,
+)
 from .context import (
     BudgetBucketReport,
     BudgetStatus,
@@ -52,6 +60,7 @@ __all__ = [
     "BudgetBucketReport",
     "BudgetStatus",
     "ChapterArtifact",
+    "ChapterRollup",
     "ChapterMemory",
     "ChapterPlan",
     "CharacterRecord",
@@ -84,6 +93,8 @@ __all__ = [
     "ReviewDecision",
     "ReviewStatus",
     "SceneProgress",
+    "SceneDraft",
+    "SceneBrief",
     "StickyConstraint",
     "StickyConstraintState",
     "StoryDirectionBatch",

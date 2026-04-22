@@ -240,10 +240,14 @@ class ContextBudgetTestCase(unittest.TestCase):
         )
 
         self.assertEqual(context.chapter_id, 3)
-        self.assertEqual(len(context.recent_memories), 2)
-        self.assertEqual(len(context.rag_hits), 3)
-        self.assertEqual(len(context.writer_packet["retrieved_context"]), 3)
-        self.assertTrue(context.writer_packet["retrieved_context"][0].startswith("chunk_0000"))
+        self.assertGreaterEqual(len(context.story_facts), 3)
+        self.assertEqual(len(context.writer_packet["retrieved_context"]), min(8, len(context.story_facts)))
+        self.assertNotIn("chapter_", context.writer_packet["retrieved_context"][0])
+        self.assertNotIn("chunk_", context.writer_packet["retrieved_context"][0])
+        self.assertNotIn("第", "".join(context.writer_packet["retrieved_context"]))
+        self.assertNotIn("本章", "".join(context.writer_packet.get("continuity_notes", [])))
+        self.assertEqual(context.source_chunk_ids, ["chunk_0000", "chunk_0001", "chunk_0002"])
+        self.assertGreaterEqual(len(context.character_snapshot), 0)
         self.assertEqual(context.project_meta["extra_brief"], "Keep the pursuit pressure high.")
         self.assertIsNotNone(context.budget_report)
 

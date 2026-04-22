@@ -105,11 +105,10 @@ class WriterContext(BaseModel):
     writer_packet: dict[str, Any] = Field(default_factory=dict)
     ending_hook: str | None = None
     user_constraints: list[str] = Field(default_factory=list)
-    recent_memories: list[ChapterMemory] = Field(default_factory=list)
-    arc_memories: list[ArcMemory] = Field(default_factory=list)
-    character_state: CharacterState = Field(default_factory=CharacterState)
-    world_state: WorldState = Field(default_factory=WorldState)
-    open_loops: list[OpenLoopItem] = Field(default_factory=list)
-    sticky_constraints: list[StickyConstraint] = Field(default_factory=list)
-    rag_hits: list[CompactRagHit] = Field(default_factory=list)
+    story_facts: list[str] = Field(default_factory=list)
+    character_snapshot: list[str] = Field(default_factory=list)
+    world_snapshot: list[str] = Field(default_factory=list)
+    active_threads: list[str] = Field(default_factory=list)
+    style_rules: list[str] = Field(default_factory=list)
+    source_chunk_ids: list[str] = Field(default_factory=list, exclude=True)
     budget_report: ContextBudgetReport | None = None

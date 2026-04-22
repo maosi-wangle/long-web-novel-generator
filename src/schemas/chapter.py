@@ -61,3 +61,21 @@ class ChapterArtifact(BaseModel):
     foreshadow_candidates: list[str] = Field(default_factory=list)
     referenced_chunks: list[str] = Field(default_factory=list)
 
+
+class SceneDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scene_id: int
+    title: str | None = None
+    markdown_body: str
+    scene_summary: str
+    new_facts: list[str] = Field(default_factory=list)
+    foreshadow_candidates: list[str] = Field(default_factory=list)
+
+
+class ChapterRollup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str
+    new_facts: list[str] = Field(default_factory=list)
+    foreshadow_candidates: list[str] = Field(default_factory=list)

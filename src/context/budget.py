@@ -102,44 +102,41 @@ class ContextBudgetManager:
         used = self._estimate_tokens(fitted)
 
         if used > self.WRITER_TOTAL_BUDGET:
-            while len(fitted.rag_hits) > 2 and used > self.WRITER_TOTAL_BUDGET:
-                fitted.rag_hits.pop()
+            while len(fitted.story_facts) > 8 and used > self.WRITER_TOTAL_BUDGET:
+                fitted.story_facts.pop()
                 actions.append("drop_low_ranked_rag_hit")
                 used = self._estimate_tokens(fitted)
 
-        if used > self.WRITER_TOTAL_BUDGET and fitted.rag_hits:
-            fitted.rag_hits = []
+        if used > self.WRITER_TOTAL_BUDGET and fitted.story_facts:
+            fitted.story_facts = fitted.story_facts[:6]
             writer_packet = dict(fitted.writer_packet)
-            writer_packet["retrieved_context"] = []
+            writer_packet["retrieved_context"] = writer_packet.get("retrieved_context", [])[:4]
             fitted.writer_packet = writer_packet
-            actions.append("drop_all_rag_hits")
+            actions.append("trim_story_facts")
             used = self._estimate_tokens(fitted)
 
-        if used > self.WRITER_TOTAL_BUDGET and fitted.recent_memories:
-            fitted.recent_memories = [self._compact_chapter_memory(memory, level=1) for memory in fitted.recent_memories]
-            actions.append("compact_recent_memories_level_1")
-            used = self._estimate_tokens(fitted)
-
-        if used > self.WRITER_TOTAL_BUDGET and len(fitted.recent_memories) > 2:
-            fitted.recent_memories = fitted.recent_memories[-2:]
-            actions.append("keep_two_recent_memories")
-            used = self._estimate_tokens(fitted)
-
-        if used > self.WRITER_TOTAL_BUDGET and fitted.arc_memories:
-            fitted.arc_memories = [self._compact_arc_memory(memory, level=1) for memory in fitted.arc_memories[-1:]]
-            actions.append("keep_latest_compacted_arc_memory")
-            used = self._estimate_tokens(fitted)
-
-        if used > self.WRITER_TOTAL_BUDGET:
-            fitted.character_state = self._compact_character_state(fitted.character_state, level=1)
-            fitted.world_state = self._compact_world_state(fitted.world_state, level=1)
-            fitted.open_loops = fitted.open_loops[:5]
+        if used > self.WRITER_TOTAL_BUDGET and len(fitted.character_snapshot) > 6:
+            fitted.character_snapshot = fitted.character_snapshot[:6]
+            fitted.world_snapshot = fitted.world_snapshot[:6]
+            fitted.active_threads = fitted.active_threads[:6]
             actions.append("compact_state_payloads_level_1")
             used = self._estimate_tokens(fitted)
 
-        if used > self.WRITER_TOTAL_BUDGET and fitted.recent_memories:
-            fitted.recent_memories = [self._compact_chapter_memory(memory, level=2) for memory in fitted.recent_memories[-1:]]
-            actions.append("keep_one_compacted_recent_memory")
+        if used > self.WRITER_TOTAL_BUDGET and len(fitted.style_rules) > 4:
+            fitted.style_rules = fitted.style_rules[:4]
+            actions.append("trim_style_rules")
+            used = self._estimate_tokens(fitted)
+
+        if used > self.WRITER_TOTAL_BUDGET:
+            fitted.story_facts = fitted.story_facts[:4]
+            fitted.character_snapshot = fitted.character_snapshot[:4]
+            fitted.world_snapshot = fitted.world_snapshot[:4]
+            fitted.active_threads = fitted.active_threads[:4]
+            writer_packet = dict(fitted.writer_packet)
+            writer_packet["retrieved_context"] = writer_packet.get("retrieved_context", [])[:3]
+            fitted.writer_packet = writer_packet
+            actions.append("compact_story_context_level_2")
+            used = self._estimate_tokens(fitted)
 
         fitted.budget_report = self._build_writer_report(fitted, actions)
         return fitted
@@ -196,15 +193,14 @@ class ContextBudgetManager:
                 "ending_hook": context.ending_hook,
                 "user_constraints": context.user_constraints,
             },
-            ContextBucket.sticky: context.sticky_constraints,
+            ContextBucket.sticky: context.style_rules,
             ContextBucket.structured_memory: {
-                "recent_memories": context.recent_memories,
-                "arc_memories": context.arc_memories,
-                "character_state": context.character_state,
-                "world_state": context.world_state,
-                "open_loops": context.open_loops,
+                "story_facts": context.story_facts,
+                "character_snapshot": context.character_snapshot,
+                "world_snapshot": context.world_snapshot,
+                "active_threads": context.active_threads,
             },
-            ContextBucket.retrieval: context.rag_hits,
+            ContextBucket.retrieval: context.writer_packet.get("retrieved_context", []),
         }
         return self._build_report(
             total_budget=self.WRITER_TOTAL_BUDGET,
