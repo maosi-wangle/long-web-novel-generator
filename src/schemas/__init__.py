@@ -41,6 +41,7 @@ from .outline import (
     CharacterProfile,
     ForeshadowingItem,
     NovelOutline,
+    ScenePlan,
     StoryDirectionCandidate,
 )
 from .project import ProjectBootstrapRequest, ProjectRecord
@@ -93,6 +94,7 @@ __all__ = [
     "ReviewDecision",
     "ReviewStatus",
     "SceneProgress",
+    "ScenePlan",
     "SceneDraft",
     "SceneBrief",
     "StickyConstraint",

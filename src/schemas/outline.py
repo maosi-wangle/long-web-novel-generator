@@ -15,14 +15,34 @@ class CharacterProfile(BaseModel):
     secrets: list[str] = Field(default_factory=list)
 
 
+class ScenePlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scene_id: int = 0
+    title: str
+    objective: str
+    beats: list[str] = Field(default_factory=list)
+    location: str | None = None
+    hook: str | None = None
+    carry_in: list[str] = Field(default_factory=list)
+    entry_state: list[str] = Field(default_factory=list)
+    exit_state: list[str] = Field(default_factory=list)
+    open_threads_created: list[str] = Field(default_factory=list)
+    open_threads_resolved: list[str] = Field(default_factory=list)
+    next_scene_must_address: list[str] = Field(default_factory=list)
+    transition_bridge: str | None = None
+
+
 class ChapterPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     chapter_id: int
     title: str
     goal: str
+    summary: str | None = None
     beats: list[str] = Field(default_factory=list)
     hook: str | None = None
+    scenes: list[ScenePlan] = Field(default_factory=list)
 
 
 class ActOutline(BaseModel):
@@ -65,4 +85,3 @@ class NovelOutline(BaseModel):
     foreshadowing: list[ForeshadowingItem] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     discarded_directions: list[StoryDirectionCandidate] = Field(default_factory=list)
-

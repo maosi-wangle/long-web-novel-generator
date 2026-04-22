@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.agents.outline_continuity import apply_outline_scene_continuity
 from src.config import REPO_ROOT
 from src.llm import CompatibleLLMClient
 from src.schemas import StoryDirectionBatch
@@ -93,8 +94,7 @@ class OutlineAgent:
                     '      "risks": ["风险1"],\n'
                     '      "score": 8.6\n'
                     "    }\n"
-                    "  ],\n"
-                    '  "selected_label": "最佳方向代号"\n'
+                    "  ]\n"
                     "}\n\n"
                     f"项目信息：\n{self._project_context(project, extra_brief)}\n\n"
                     f"候选方向：\n{candidate_json}"
@@ -112,12 +112,11 @@ class OutlineAgent:
         if not evaluated:
             raise RuntimeError("OutlineAgent failed to evaluate story directions.")
 
-        scored = sorted(
+        return sorted(
             evaluated,
             key=lambda item: item.score if item.score is not None else -1.0,
             reverse=True,
         )
-        return scored
 
     def _finalize_outline(
         self,
@@ -146,15 +145,33 @@ class OutlineAgent:
             "acts": [
                 {
                     "act_id": 1,
-                    "title": "篇章标题",
-                    "summary": "篇章摘要",
+                    "title": "幕标题",
+                    "summary": "幕摘要",
                     "chapters": [
                         {
                             "chapter_id": 1,
                             "title": "章节标题",
-                            "goal": "章节目标",
-                            "beats": ["情节节拍1"],
-                            "hook": "章末钩子",
+                            "goal": "章节展示层目标",
+                            "summary": "这一章作为展示容器的概括",
+                            "beats": ["章节层摘要拍点"],
+                            "hook": "章节末尾钩子",
+                            "scenes": [
+                                {
+                                    "scene_id": 0,
+                                    "title": "场景标题",
+                                    "objective": "场景真正推进的目标",
+                                    "beats": ["场景拍点1"],
+                                    "location": "场景地点",
+                                    "hook": "场景结尾留下的悬念或压力",
+                                    "carry_in": ["上一场景遗留问题"],
+                                    "entry_state": ["进入场景时的局势"],
+                                    "exit_state": ["离开场景时的新局势"],
+                                    "open_threads_created": ["本场景新开启的线"],
+                                    "open_threads_resolved": ["本场景解决的线"],
+                                    "next_scene_must_address": ["下一场景必须承接的事项"],
+                                    "transition_bridge": "为什么能自然衔接到下一场景",
+                                }
+                            ],
                         }
                     ],
                 }
@@ -178,9 +195,12 @@ class OutlineAgent:
                     "要求：\n"
                     "1. 这是长篇小说总纲，不是单章简介。\n"
                     "2. act 至少 3 个，总章节数至少 12 章，建议 12 到 18 章。\n"
-                    "3. chapter_id 必须从 1 开始在全书范围内连续递增，不能在不同 act 内重复。\n"
-                    "4. 保持后续 Detail Outline Agent 可继续展开的空间。\n"
-                    "5. 必须只输出 JSON，字段必须兼容下面的结构示例。\n\n"
+                    "3. chapter 只是展示容器，真正推进剧情的最小单位是 scene，每章必须包含 2 到 4 个 scenes。\n"
+                    "4. chapter_id 必须从 1 开始在全书范围内连续递增，不能在不同 act 内重复。\n"
+                    "5. scene 之间必须连续：上一 scene 的 hook 或未解决压力，要在下一 scene 的 carry_in 或 transition_bridge 里被承接。\n"
+                    "6. 不要为了凑章节而硬切语义，场景要形成自然动作链。\n"
+                    "7. 保持后续 Detail Outline Agent 可继续展开的空间。\n"
+                    "8. 必须只输出 JSON，字段必须兼容下面的结构示例。\n\n"
                     f"结构示例：\n{json.dumps(schema_hint, ensure_ascii=False, indent=2)}\n\n"
                     f"项目信息：\n{self._project_context(project, extra_brief)}\n\n"
                     f"已评估候选方向：\n{evaluated_json}"
@@ -203,7 +223,7 @@ class OutlineAgent:
             for chapter in act.chapters:
                 chapter.chapter_id = chapter_id
                 chapter_id += 1
-        return outline
+        return apply_outline_scene_continuity(outline)
 
     def _load_prompt(self) -> str:
         prompt_path = Path(REPO_ROOT) / "src" / "agents" / "prompts" / "outline.md"
