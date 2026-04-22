@@ -5,10 +5,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.context import ContextAssembler
 from src.config import REPO_ROOT
 from src.llm import CompatibleLLMClient
 from src.orchestrator.state import ProjectState
-from src.schemas import DetailOutlineAnalysis
+from src.schemas import DetailOutlineAnalysis, DetailOutlineContext
 from src.schemas.chapter import DetailOutline
 from src.schemas.outline import ActOutline, ChapterPlan, NovelOutline
 from src.schemas.project import ProjectRecord
@@ -31,9 +32,11 @@ class DetailOutlineAgent:
         self,
         client: CompatibleLLMClient | None = None,
         markdown_store: MarkdownStore | None = None,
+        context_assembler: ContextAssembler | None = None,
     ) -> None:
         self.client = client or CompatibleLLMClient()
         self.markdown_store = markdown_store or MarkdownStore()
+        self.context_assembler = context_assembler or ContextAssembler()
         self.prompt_template = self._load_prompt()
 
     def generate_detail_outline(
@@ -47,7 +50,15 @@ class DetailOutlineAgent:
     ) -> DetailOutline:
         selection = self._resolve_target_chapter(outline, state, chapter_id)
         rag_result = self._retrieve_context(project.project_id, selection, state)
-        chapter_context = self._build_chapter_context(outline, selection, state, project.project_id, rag_result)
+        chapter_context_model = self._build_chapter_context(
+            project=project,
+            state=state,
+            outline=outline,
+            selection=selection,
+            rag_result=rag_result,
+            extra_brief=extra_brief,
+        )
+        chapter_context = chapter_context_model.model_dump(mode="json")
         analysis = self._analyze_chapter(project, state, outline, chapter_context, extra_brief)
         detail_outline = self._draft_detail_outline(project, state, outline, chapter_context, analysis, extra_brief)
         detail_outline = self._normalize_detail_outline(detail_outline, selection, rag_result)
@@ -87,39 +98,33 @@ class DetailOutlineAgent:
 
     def _build_chapter_context(
         self,
+        *,
+        project: ProjectRecord,
+        state: ProjectState,
         outline: NovelOutline,
         selection: ChapterSelection,
-        state: ProjectState,
-        project_id: str,
         rag_result: RagSearchResult,
-    ) -> dict[str, Any]:
+        extra_brief: str | None,
+    ) -> DetailOutlineContext:
         flattened = [chapter for act in outline.acts for chapter in act.chapters]
         current_index = next(
             index for index, chapter in enumerate(flattened) if chapter.chapter_id == selection.chapter.chapter_id
         )
         previous_chapter = flattened[current_index - 1] if current_index > 0 else None
         next_chapter = flattened[current_index + 1] if current_index + 1 < len(flattened) else None
-
-        recent_ids = [chapter.chapter_id for chapter in flattened if chapter.chapter_id <= state.last_completed_chapter][-2:]
-        recent_written_context = self.markdown_store.load_recent_chapter_context(
-            project_id,
-            chapter_ids=recent_ids,
+        current_act = selection.act.model_dump(mode="json")
+        current_act["act_index"] = selection.act_index
+        return self.context_assembler.build_detail_context(
+            project=project,
+            state=state,
+            outline=outline,
+            current_chapter=selection.chapter.model_dump(mode="json"),
+            current_act=current_act,
+            previous_chapter=previous_chapter.model_dump(mode="json") if previous_chapter else None,
+            next_chapter=next_chapter.model_dump(mode="json") if next_chapter else None,
+            rag_result=rag_result,
+            extra_brief=extra_brief,
         )
-
-        return {
-            "current_act_index": selection.act_index,
-            "current_act": selection.act.model_dump(mode="json"),
-            "current_chapter": selection.chapter.model_dump(mode="json"),
-            "previous_chapter": previous_chapter.model_dump(mode="json") if previous_chapter else None,
-            "next_chapter": next_chapter.model_dump(mode="json") if next_chapter else None,
-            "recent_written_context": recent_written_context,
-            "rag_hits": [hit.model_dump(mode="json") for hit in rag_result.hits],
-            "project_progress": state.model_dump(mode="json"),
-            "foreshadowing": [item.model_dump(mode="json") for item in outline.foreshadowing],
-            "global_constraints": outline.constraints,
-            "world_setting": outline.world_setting,
-            "core_characters": [character.model_dump(mode="json") for character in outline.characters],
-        }
 
     def _retrieve_context(
         self,
