@@ -1,6 +1,6 @@
 # generateNovel3
 
-多 Agent 中文小说生成器工程骨架。
+多 Agent 中文小说生成器工程骨架。生成示例：exampleNovel.md
 
 当前仓库已具备：
 
@@ -54,17 +54,6 @@ generate-novel resolve-review demo_project --review-id review_0001 --decision ap
 python -m src.app init-project demo_project --title "示例小说"
 ```
 
-## 当前范围
-
-本次已接入总纲阶段，尚未接入：
-
-- 人工介入 tool 的交互式后端
-
-注意：
-
-- 当前 human tool 已支持本地 review 文件、待处理队列和 CLI 解决流程
-- 还没有接 Web UI 或消息通知
-
 ## RAG 默认配置
 
 项目默认使用：
@@ -77,9 +66,7 @@ DENSE_WEIGHT=0.65
 SPARSE_WEIGHT=0.35
 ```
 
-当前实现采用“每次 ingest 重新构建当前项目索引”的 MVP 策略，优先保证重写章节时索引不会脏。
-
-这些模块的接口与数据边界已在 [design.md](design.md) 中确认，并在本轮骨架代码里预留了 schema 与 workflow 入口。
+当前实现采用“每次 ingest 重新构建当前项目索引”策略，优先保证重写章节时索引不会脏。
 
 ## 环境变量
 
