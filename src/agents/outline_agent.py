@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from src.config import REPO_ROOT
 from src.llm import CompatibleLLMClient
+from src.schemas import StoryDirectionBatch
 from src.schemas.outline import NovelOutline, StoryDirectionCandidate
 from src.schemas.project import ProjectRecord
 
@@ -57,13 +56,14 @@ class OutlineAgent:
                 ),
             },
         ]
-        raw = self.client.chat_json(
+        response = self.client.chat_model(
             model=self.client.settings.outline_model,
+            response_model=StoryDirectionBatch,
             messages=messages,
             temperature=0.9,
             max_tokens=2200,
         )
-        candidates = [StoryDirectionCandidate.model_validate(item) for item in raw.get("candidates", [])]
+        candidates = response.candidates
         if len(candidates) < 3:
             raise RuntimeError("OutlineAgent expected at least 3 direction candidates from the model.")
         return candidates
@@ -101,13 +101,14 @@ class OutlineAgent:
                 ),
             },
         ]
-        raw = self.client.chat_json(
+        response = self.client.chat_model(
             model=self.client.settings.outline_model,
+            response_model=StoryDirectionBatch,
             messages=messages,
             temperature=0.4,
             max_tokens=2200,
         )
-        evaluated = [StoryDirectionCandidate.model_validate(item) for item in raw.get("candidates", [])]
+        evaluated = response.candidates
         if not evaluated:
             raise RuntimeError("OutlineAgent failed to evaluate story directions.")
 
@@ -186,17 +187,15 @@ class OutlineAgent:
                 ),
             },
         ]
-        raw = self.client.chat_json(
+        outline = self.client.chat_model(
             model=self.client.settings.outline_model,
+            response_model=NovelOutline,
             messages=messages,
             temperature=0.7,
             max_tokens=5000,
         )
-        raw["discarded_directions"] = []
-        try:
-            return NovelOutline.model_validate(raw)
-        except ValidationError as exc:
-            raise RuntimeError(f"OutlineAgent returned invalid outline schema: {exc}") from exc
+        outline.discarded_directions = []
+        return outline
 
     def _normalize_outline(self, outline: NovelOutline) -> NovelOutline:
         chapter_id = 1

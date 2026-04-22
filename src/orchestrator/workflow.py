@@ -111,6 +111,13 @@ class NovelWorkflow:
         self.state_store.save_state(project_id, state)
         return state
 
+    def append_note(self, project_id: str, note: str) -> ProjectState:
+        state = self.state_store.load_state(project_id)
+        state.notes.append(note)
+        state.touch()
+        self.state_store.save_state(project_id, state)
+        return state
+
     @staticmethod
     def resolve_default_detail_chapter_id(state: ProjectState) -> int:
         if state.current_chapter_index > state.last_completed_chapter:

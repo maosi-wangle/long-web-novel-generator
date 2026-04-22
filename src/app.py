@@ -20,6 +20,13 @@ app = typer.Typer(no_args_is_help=True, help="Novel generator project CLI.")
 load_local_env()
 
 
+def _ensure_no_pending_review(state) -> None:
+    if state.pending_human_review:
+        raise typer.BadParameter(
+            f"Project has a pending review ({state.pending_review_id}). Resolve it before continuing."
+        )
+
+
 @app.command("init-project")
 def init_project(
     project_id: str = typer.Argument(..., help="Stable project identifier."),
@@ -56,9 +63,9 @@ def generate_outline(
 ) -> None:
     workflow = NovelWorkflow()
     project, state = workflow.load_project(project_id)
+    _ensure_no_pending_review(state)
     agent = OutlineAgent()
     outline = agent.generate_outline(project=project, extra_brief=brief or None)
-    state = workflow.save_outline(project_id, outline)
     if require_review:
         review = HumanTool(project_id, workflow).request_review(
             stage="outline_review",
@@ -66,12 +73,13 @@ def generate_outline(
             payload=outline.model_dump(mode="json"),
             source_status=state.status.value,
             source_stage=state.current_stage.value,
+            blocking=True,
         )
         typer.echo(
-            f"Saved outline to {get_project_paths(project_id).outline_file} and opened review {review.review_id} "
-            f"at {review.payload_file}."
+            f"Generated outline draft and opened review {review.review_id} at {review.payload_file}."
         )
         return
+    state = workflow.save_outline(project_id, outline)
     outline_path = get_project_paths(project_id).outline_file
     typer.echo(
         f"Saved outline to {outline_path} with outline_version={state.outline_version} and status={state.status.value}."
@@ -95,6 +103,7 @@ def generate_detail_outline(
 ) -> None:
     workflow = NovelWorkflow()
     project, state = workflow.load_project(project_id)
+    _ensure_no_pending_review(state)
     outline = workflow.load_outline(project_id)
     agent = DetailOutlineAgent()
     target_chapter_id = chapter_id or workflow.resolve_default_detail_chapter_id(state)
@@ -105,7 +114,6 @@ def generate_detail_outline(
         chapter_id=target_chapter_id,
         extra_brief=brief or None,
     )
-    state = workflow.save_detail_outline(project_id, detail_outline)
     detail_path = get_project_paths(project_id).detail_outlines_dir / f"{detail_outline.chapter_id:04d}.json"
     if require_review:
         review = HumanTool(project_id, workflow).request_review(
@@ -115,12 +123,14 @@ def generate_detail_outline(
             source_status=state.status.value,
             source_stage=state.current_stage.value,
             target_chapter_id=detail_outline.chapter_id,
+            blocking=True,
         )
         typer.echo(
-            f"Saved detail outline for chapter {detail_outline.chapter_id} to {detail_path} and opened review "
+            f"Generated detail outline draft for chapter {detail_outline.chapter_id} and opened review "
             f"{review.review_id} at {review.payload_file}."
         )
         return
+    state = workflow.save_detail_outline(project_id, detail_outline)
     typer.echo(
         f"Saved detail outline for chapter {detail_outline.chapter_id} to {detail_path} "
         f"with detail_outline_version={state.detail_outline_version} and status={state.status.value}."
@@ -148,6 +158,7 @@ def write_chapter(
 ) -> None:
     workflow = NovelWorkflow()
     project, state = workflow.load_project(project_id)
+    _ensure_no_pending_review(state)
     target_chapter_id = chapter_id or workflow.resolve_default_detail_chapter_id(state)
     detail_outline = workflow.load_detail_outline(project_id, target_chapter_id)
     agent = WriterAgent()
@@ -170,6 +181,7 @@ def write_chapter(
             source_stage=state.current_stage.value,
             target_chapter_id=chapter.chapter_id,
             preview_markdown=preview_markdown,
+            blocking=True,
         )
         typer.echo(
             f"Generated chapter {chapter.chapter_id} draft and opened review {review.review_id} "
@@ -251,7 +263,9 @@ def request_review(
 ) -> None:
     workflow = NovelWorkflow()
     _, state = workflow.load_project(project_id)
+    _ensure_no_pending_review(state)
     tool = HumanTool(project_id, workflow)
+    blocking = False
 
     if stage == "outline_review":
         outline = workflow.load_outline(project_id)
@@ -261,6 +275,7 @@ def request_review(
             payload=outline.model_dump(mode="json"),
             source_status=state.status.value,
             source_stage=state.current_stage.value,
+            blocking=blocking,
         )
     elif stage == "detail_outline_review":
         if chapter_id <= 0:
@@ -273,6 +288,7 @@ def request_review(
             source_status=state.status.value,
             source_stage=state.current_stage.value,
             target_chapter_id=chapter_id,
+            blocking=blocking,
         )
     elif stage == "chapter_review":
         if chapter_id <= 0:
@@ -291,6 +307,7 @@ def request_review(
             source_stage=state.current_stage.value,
             target_chapter_id=chapter_id,
             preview_markdown=preview_markdown,
+            blocking=blocking,
         )
     else:
         raise typer.BadParameter("stage must be one of: outline_review, detail_outline_review, chapter_review")
@@ -337,9 +354,9 @@ def resolve_review(
         edited_file=edited_file or None,
         operator=operator,
     )
+    resolved_decision = "approve" if record.resolution and record.resolution.approved else "reject"
     typer.echo(
-        f"Resolved review {record.review_id} with decision={record.resolution.approved if record.resolution else 'unknown'} "
-        f"and status={record.status.value}."
+        f"Resolved review {record.review_id} with decision={resolved_decision} and status={record.status.value}."
     )
 
 

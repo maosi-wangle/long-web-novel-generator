@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from src.config import REPO_ROOT
 from src.llm import CompatibleLLMClient
 from src.schemas.chapter import ChapterArtifact, DetailOutline
@@ -57,16 +55,13 @@ class WriterAgent:
                 ),
             },
         ]
-        raw = self.client.chat_json(
+        artifact = self.client.chat_model(
             model=self.client.settings.writer_model,
+            response_model=ChapterArtifact,
             messages=messages,
             temperature=0.75,
             max_tokens=5200,
         )
-        try:
-            artifact = ChapterArtifact.model_validate(raw)
-        except ValidationError as exc:
-            raise RuntimeError(f"WriterAgent returned invalid chapter schema: {exc}") from exc
 
         return self._normalize_artifact(artifact, detail_outline, retrieved_context)
 

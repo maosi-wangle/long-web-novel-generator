@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from src.config import REPO_ROOT
 from src.llm import CompatibleLLMClient
 from src.orchestrator.state import ProjectState
+from src.schemas import DetailOutlineAnalysis
 from src.schemas.chapter import DetailOutline
 from src.schemas.outline import ActOutline, ChapterPlan, NovelOutline
 from src.schemas.project import ProjectRecord
@@ -184,12 +183,14 @@ class DetailOutlineAgent:
                 ),
             },
         ]
-        return self.client.chat_json(
+        analysis = self.client.chat_model(
             model=self.client.settings.detail_outline_model,
+            response_model=DetailOutlineAnalysis,
             messages=messages,
             temperature=0.5,
             max_tokens=2600,
         )
+        return analysis.model_dump(mode="json")
 
     def _draft_detail_outline(
         self,
@@ -255,16 +256,13 @@ class DetailOutlineAgent:
                 ),
             },
         ]
-        raw = self.client.chat_json(
+        return self.client.chat_model(
             model=self.client.settings.detail_outline_model,
+            response_model=DetailOutline,
             messages=messages,
             temperature=0.6,
             max_tokens=3800,
         )
-        try:
-            return DetailOutline.model_validate(raw)
-        except ValidationError as exc:
-            raise RuntimeError(f"DetailOutlineAgent returned invalid detail outline schema: {exc}") from exc
 
     def _normalize_detail_outline(
         self,

@@ -1,3 +1,4 @@
+from .agent_outputs import DetailOutlineAnalysis, StoryDirectionBatch
 from .chapter import ChapterArtifact, DetailOutline, InternalReasoningPackage, WriterPacket
 from .memory import ChunkRecord, RagIngestResult
 from .outline import (
@@ -25,6 +26,7 @@ __all__ = [
     "ChapterPlan",
     "CharacterProfile",
     "ChunkRecord",
+    "DetailOutlineAnalysis",
     "DetailOutline",
     "ForeshadowingItem",
     "HumanInterventionRequest",
@@ -42,6 +44,7 @@ __all__ = [
     "ReviewDecision",
     "ReviewStatus",
     "SceneProgress",
+    "StoryDirectionBatch",
     "StoryDirectionCandidate",
     "WriterPacket",
 ]

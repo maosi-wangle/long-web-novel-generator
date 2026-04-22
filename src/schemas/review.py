@@ -28,6 +28,7 @@ class HumanReviewRecord(BaseModel):
     review_id: str
     project_id: str
     stage: str
+    blocking: bool = True
     status: ReviewStatus = ReviewStatus.pending
     reason: str
     payload_file: str
@@ -38,4 +39,3 @@ class HumanReviewRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     resolution: HumanInterventionResult | None = None
-
